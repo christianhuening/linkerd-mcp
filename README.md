@@ -1,5 +1,11 @@
 # Linkerd MCP Server
 
+[![CI](https://github.com/christianhuening/linkerd-mcp/workflows/CI/badge.svg)](https://github.com/christianhuening/linkerd-mcp/actions/workflows/ci.yml)
+[![Docker Build](https://github.com/christianhuening/linkerd-mcp/workflows/Docker%20Build/badge.svg)](https://github.com/christianhuening/linkerd-mcp/actions/workflows/docker.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/christianhuening/linkerd-mcp)](https://goreportcard.com/report/github.com/christianhuening/linkerd-mcp)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/christianhuening/linkerd-mcp)](https://go.dev/doc/devel/release)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A Model Context Protocol (MCP) server for interacting with Linkerd service mesh in Kubernetes clusters. This server enables AI agents to query service mesh health status and analyze connectivity policies between services.
 
 ## Features
@@ -7,6 +13,32 @@ A Model Context Protocol (MCP) server for interacting with Linkerd service mesh 
 - **Service Mesh Health Monitoring**: Check the health status of Linkerd control plane components
 - **Connectivity Analysis**: Analyze Linkerd policies to determine allowed connectivity between services
 - **Service Discovery**: List all services that are part of the Linkerd mesh
+- **Authorization Policy Analysis**: Query which services can access a target or what targets a source can reach
+- **Production Ready**: Modern security features, Helm charts, comprehensive tests, and CI/CD
+
+## Quick Start
+
+### Using Docker
+
+```bash
+docker pull ghcr.io/christianhuening/linkerd-mcp:latest
+docker run --rm -v ~/.kube/config:/root/.kube/config ghcr.io/christianhuening/linkerd-mcp:latest
+```
+
+### Using Helm
+
+```bash
+helm install linkerd-mcp ./helm/linkerd-mcp -n linkerd --create-namespace
+```
+
+### From Source
+
+```bash
+git clone https://github.com/christianhuening/linkerd-mcp.git
+cd linkerd-mcp
+go build -o linkerd-mcp
+./linkerd-mcp
+```
 
 ## MCP Tools
 
@@ -37,9 +69,27 @@ Lists all services that are part of the Linkerd mesh.
 
 **Returns:** JSON list of meshed services with their pods
 
+### 4. `get_allowed_targets`
+Find all services that a given source service can communicate with based on Linkerd authorization policies.
+
+**Arguments:**
+- `source_namespace` (required): Namespace of the source service
+- `source_service` (required): Name of the source service
+
+**Returns:** JSON list of all targets the source is authorized to access
+
+### 5. `get_allowed_sources`
+Find all services that can communicate with a given target service based on Linkerd authorization policies.
+
+**Arguments:**
+- `target_namespace` (required): Namespace of the target service
+- `target_service` (required): Name of the target service
+
+**Returns:** JSON list of all sources authorized to access the target
+
 ## Prerequisites
 
-- Go 1.23 or later
+- Go 1.25 or later
 - Kubernetes cluster with Linkerd installed
 - `kubectl` configured to access your cluster
 - Docker (for containerization)
@@ -124,10 +174,53 @@ These are configured in k8s/deployment.yaml.
 
 ## Architecture
 
-The server uses:
+The server uses a modular architecture with clean separation of concerns:
+
+```
+linkerd-mcp/
+├── main.go                    # Entry point (31 lines)
+└── internal/
+    ├── config/                # Kubernetes client configuration
+    ├── health/                # Control plane health checking
+    ├── mesh/                  # Service discovery
+    ├── policy/                # Authorization policy analysis
+    └── server/                # MCP server and tool registration
+```
+
+**Key Technologies:**
 - **mcp-go**: Go implementation of the Model Context Protocol
 - **client-go**: Official Kubernetes Go client
 - **Linkerd Policy CRDs**: For analyzing service-to-service connectivity policies
+
+See [internal/README.md](internal/README.md) for detailed architecture documentation.
+
+## Testing
+
+The project includes comprehensive unit tests with 33+ test cases:
+
+```bash
+# Run all tests
+go test ./internal/... -v
+
+# Run tests with coverage
+go test ./internal/... -cover
+
+# Generate coverage report
+go test ./internal/... -coverprofile=coverage.out
+go tool cover -html=coverage.out
+```
+
+See [TESTING.md](TESTING.md) for complete testing documentation.
+
+## CI/CD
+
+The project uses GitHub Actions for continuous integration and deployment:
+
+- **CI Workflow**: Runs tests, linting, and security scans on every PR
+- **Docker Workflow**: Builds multi-platform images and pushes to GHCR
+- **Release Workflow**: Creates releases with binaries for all platforms
+
+See [.github/workflows/README.md](.github/workflows/README.md) for CI/CD documentation.
 
 ## Future Enhancements
 
