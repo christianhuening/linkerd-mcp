@@ -349,7 +349,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.24'
+          go-version: '1.25'
       - name: Run tests
         run: go test ./internal/... -v -cover
       - name: Generate coverage

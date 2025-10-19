@@ -17,7 +17,7 @@ This directory contains the CI/CD workflows for the Linkerd MCP server.
 - Enforces Go best practices and style guidelines
 
 #### Test
-- Runs on Go 1.24 and 1.25 (matrix build)
+- Runs on Go 1.25 and 1.25 (matrix build)
 - Executes all unit tests with race detection
 - Generates coverage reports
 - Uploads coverage to Codecov
@@ -306,7 +306,7 @@ Update in all workflow files:
 
 ```yaml
 - name: Set up Go
-  uses: actions/setup-go@v5
+  uses: actions/setup-go@v6
   with:
     go-version: '1.23'  # Change version here
 ```
