@@ -8,6 +8,8 @@
 
 A Model Context Protocol (MCP) server for interacting with Linkerd service mesh in Kubernetes clusters. This server enables AI agents to query service mesh health status and analyze connectivity policies between services.
 
+DISCLAIMER: This project has been created with Claude.AI!
+
 ## Features
 
 - **Service Mesh Health Monitoring**: Check the health status of Linkerd control plane components
