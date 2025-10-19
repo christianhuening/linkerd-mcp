@@ -161,7 +161,7 @@ Integration tests are skipped by default. To run against a real cluster:
 
 GitHub Actions workflows (`.github/workflows/`):
 
-- **ci.yml**: Runs on PR/push - lint, test (Go 1.24/1.25), build multi-platform binaries, security scans
+- **ci.yml**: Runs on PR/push - lint, test (Go 1.24/1.24), build multi-platform binaries, security scans
 - **docker.yml**: Builds and pushes multi-arch Docker images to GHCR
 - **release.yml**: Creates GitHub releases with binaries for all platforms
 
@@ -255,4 +255,4 @@ for _, item := range list.Items {
 
 ## Go Version
 
-Project uses **Go 1.25** (see go.mod). CI tests against Go 1.24 and 1.25 for compatibility.
+Project uses **Go 1.24** (see go.mod). CI tests against Go 1.24 and 1.24 for compatibility.

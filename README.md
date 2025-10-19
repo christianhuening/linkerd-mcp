@@ -91,7 +91,7 @@ Find all services that can communicate with a given target service based on Link
 
 ## Prerequisites
 
-- Go 1.25 or later
+- Go 1.23 or later
 - Kubernetes cluster with Linkerd installed
 - `kubectl` configured to access your cluster
 - Docker (for containerization)
