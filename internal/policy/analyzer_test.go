@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/christianhuening/linkerd-mcp/internal/testutil"
+	"github.com/mark3labs/mcp-go/mcp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -16,8 +17,17 @@ import (
 func setupPolicyTest() (*Analyzer, *kubefake.Clientset, *fake.FakeDynamicClient) {
 	scheme := runtime.NewScheme()
 
+	// Register custom list kinds for Linkerd CRDs
+	gvrToListKind := map[schema.GroupVersionResource]string{
+		{Group: "policy.linkerd.io", Version: "v1beta3", Resource: "servers"}:                  "ServerList",
+		{Group: "policy.linkerd.io", Version: "v1alpha1", Resource: "authorizationpolicies"}:   "AuthorizationPolicyList",
+		{Group: "policy.linkerd.io", Version: "v1alpha1", Resource: "meshtlsauthentications"}:  "MeshTLSAuthenticationList",
+		{Group: "policy.linkerd.io", Version: "v1alpha1", Resource: "networkauthentications"}:  "NetworkAuthenticationList",
+		{Group: "policy.linkerd.io", Version: "v1alpha1", Resource: "httproutes"}:              "HTTPRouteList",
+	}
+
 	kubeClient := kubefake.NewSimpleClientset()
-	dynamicClient := fake.NewSimpleDynamicClient(scheme)
+	dynamicClient := fake.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrToListKind)
 
 	analyzer := NewAnalyzer(kubeClient, dynamicClient)
 	return analyzer, kubeClient, dynamicClient
@@ -39,7 +49,11 @@ func TestAnalyzeConnectivity(t *testing.T) {
 	}
 
 	var analysis map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &analysis); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &analysis); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 
@@ -77,7 +91,11 @@ func TestAnalyzeConnectivity_DefaultTargetNamespace(t *testing.T) {
 	}
 
 	var analysis map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &analysis); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &analysis); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 
@@ -106,8 +124,12 @@ func TestGetAllowedTargets_NoPodsFound(t *testing.T) {
 	}
 
 	expectedError := "no pods found for service nonexistent in namespace prod"
-	if result.Content[0].Text != expectedError {
-		t.Errorf("Expected error message '%s', got: %s", expectedError, result.Content[0].Text)
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if textContent.Text != expectedError {
+		t.Errorf("Expected error message '%s', got: %s", expectedError, textContent.Text)
 	}
 }
 
@@ -116,11 +138,11 @@ func TestGetAllowedTargets_WithPods(t *testing.T) {
 
 	// Add source pod
 	pod := testutil.CreatePod("frontend-1", "prod", "frontend-sa", map[string]string{"app": "frontend"}, "Running", true)
-	kubeClient.CoreV1().Pods("prod").Create(context.Background(), pod, nil)
+	kubeClient.CoreV1().Pods("prod").Create(context.Background(), pod, metav1.CreateOptions{})
 
 	// Add Server CRD
 	server := testutil.CreateServer("backend-server", "prod", map[string]string{"app": "backend"}, 8080)
-	dynamicClient.Resource(serverGVR).Namespace("prod").Create(context.Background(), server, nil)
+	dynamicClient.Resource(serverGVR).Namespace("prod").Create(context.Background(), server, metav1.CreateOptions{})
 
 	// Add AuthorizationPolicy
 	authPolicy := testutil.CreateAuthorizationPolicy(
@@ -129,7 +151,7 @@ func TestGetAllowedTargets_WithPods(t *testing.T) {
 		"backend-server",
 		[]map[string]string{{"name": "frontend-auth", "kind": "MeshTLSAuthentication"}},
 	)
-	dynamicClient.Resource(authPolicyGVR).Namespace("prod").Create(context.Background(), authPolicy, nil)
+	dynamicClient.Resource(authPolicyGVR).Namespace("prod").Create(context.Background(), authPolicy, metav1.CreateOptions{})
 
 	// Add MeshTLSAuthentication allowing frontend
 	meshAuth := testutil.CreateMeshTLSAuthentication(
@@ -138,7 +160,7 @@ func TestGetAllowedTargets_WithPods(t *testing.T) {
 		[]string{"frontend-sa.prod.serviceaccount.identity.linkerd.cluster.local"},
 		nil,
 	)
-	dynamicClient.Resource(meshTLSAuthGVR).Namespace("prod").Create(context.Background(), meshAuth, nil)
+	dynamicClient.Resource(meshTLSAuthGVR).Namespace("prod").Create(context.Background(), meshAuth, metav1.CreateOptions{})
 
 	result, err := analyzer.GetAllowedTargets(context.Background(), "prod", "frontend")
 
@@ -147,7 +169,11 @@ func TestGetAllowedTargets_WithPods(t *testing.T) {
 	}
 
 	var response map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &response); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 
@@ -174,8 +200,12 @@ func TestGetAllowedSources_NoServersFound(t *testing.T) {
 	}
 
 	expectedMessage := "No Linkerd Servers found for service backend in namespace prod"
-	if result.Content[0].Text != expectedMessage {
-		t.Errorf("Expected message '%s', got: %s", expectedMessage, result.Content[0].Text)
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if textContent.Text != expectedMessage {
+		t.Errorf("Expected message '%s', got: %s", expectedMessage, textContent.Text)
 	}
 }
 
@@ -184,7 +214,7 @@ func TestGetAllowedSources_WithServersAndPolicies(t *testing.T) {
 
 	// Add Server for backend
 	server := testutil.CreateServer("backend-server", "prod", map[string]string{"app": "backend"}, 8080)
-	dynamicClient.Resource(serverGVR).Namespace("prod").Create(context.Background(), server, nil)
+	dynamicClient.Resource(serverGVR).Namespace("prod").Create(context.Background(), server, metav1.CreateOptions{})
 
 	// Add AuthorizationPolicy
 	authPolicy := testutil.CreateAuthorizationPolicy(
@@ -193,7 +223,7 @@ func TestGetAllowedSources_WithServersAndPolicies(t *testing.T) {
 		"backend-server",
 		[]map[string]string{{"name": "all-auth", "kind": "MeshTLSAuthentication"}},
 	)
-	dynamicClient.Resource(authPolicyGVR).Namespace("prod").Create(context.Background(), authPolicy, nil)
+	dynamicClient.Resource(authPolicyGVR).Namespace("prod").Create(context.Background(), authPolicy, metav1.CreateOptions{})
 
 	// Add MeshTLSAuthentication with wildcard
 	meshAuth := testutil.CreateMeshTLSAuthentication(
@@ -202,7 +232,7 @@ func TestGetAllowedSources_WithServersAndPolicies(t *testing.T) {
 		[]string{"*"},
 		nil,
 	)
-	dynamicClient.Resource(meshTLSAuthGVR).Namespace("prod").Create(context.Background(), meshAuth, nil)
+	dynamicClient.Resource(meshTLSAuthGVR).Namespace("prod").Create(context.Background(), meshAuth, metav1.CreateOptions{})
 
 	result, err := analyzer.GetAllowedSources(context.Background(), "prod", "backend")
 
@@ -211,7 +241,11 @@ func TestGetAllowedSources_WithServersAndPolicies(t *testing.T) {
 	}
 
 	var response map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &response); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 
@@ -246,7 +280,7 @@ func TestGetAllowedSources_WithServiceAccounts(t *testing.T) {
 
 	// Add Server
 	server := testutil.CreateServer("api-server", "prod", map[string]string{"app": "api"}, 8080)
-	dynamicClient.Resource(serverGVR).Namespace("prod").Create(context.Background(), server, nil)
+	dynamicClient.Resource(serverGVR).Namespace("prod").Create(context.Background(), server, metav1.CreateOptions{})
 
 	// Add AuthorizationPolicy
 	authPolicy := testutil.CreateAuthorizationPolicy(
@@ -255,7 +289,7 @@ func TestGetAllowedSources_WithServiceAccounts(t *testing.T) {
 		"api-server",
 		[]map[string]string{{"name": "frontend-auth", "kind": "MeshTLSAuthentication"}},
 	)
-	dynamicClient.Resource(authPolicyGVR).Namespace("prod").Create(context.Background(), authPolicy, nil)
+	dynamicClient.Resource(authPolicyGVR).Namespace("prod").Create(context.Background(), authPolicy, metav1.CreateOptions{})
 
 	// Add MeshTLSAuthentication with service accounts
 	meshAuth := testutil.CreateMeshTLSAuthentication(
@@ -267,7 +301,7 @@ func TestGetAllowedSources_WithServiceAccounts(t *testing.T) {
 			{"name": "admin-sa", "namespace": "admin"},
 		},
 	)
-	dynamicClient.Resource(meshTLSAuthGVR).Namespace("prod").Create(context.Background(), meshAuth, nil)
+	dynamicClient.Resource(meshTLSAuthGVR).Namespace("prod").Create(context.Background(), meshAuth, metav1.CreateOptions{})
 
 	result, err := analyzer.GetAllowedSources(context.Background(), "prod", "api")
 
@@ -276,7 +310,11 @@ func TestGetAllowedSources_WithServiceAccounts(t *testing.T) {
 	}
 
 	var response map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &response); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 

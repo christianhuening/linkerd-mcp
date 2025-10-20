@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -90,7 +89,7 @@ func TestToolRegistration_CheckMeshHealth(t *testing.T) {
 	}
 
 	request := mcp.CallToolRequest{
-		Params: mcp.CallToolRequestParams{
+		Params: mcp.CallToolParams{
 			Arguments: args,
 		},
 	}
@@ -116,7 +115,7 @@ func TestToolRegistration_AnalyzeConnectivity(t *testing.T) {
 	}
 
 	request := mcp.CallToolRequest{
-		Params: mcp.CallToolRequestParams{
+		Params: mcp.CallToolParams{
 			Arguments: args,
 		},
 	}
@@ -153,7 +152,7 @@ func TestToolRegistration_ListMeshedServices(t *testing.T) {
 	}
 
 	request := mcp.CallToolRequest{
-		Params: mcp.CallToolRequestParams{
+		Params: mcp.CallToolParams{
 			Arguments: args,
 		},
 	}
@@ -176,7 +175,7 @@ func TestToolRegistration_GetAllowedTargets(t *testing.T) {
 	}
 
 	request := mcp.CallToolRequest{
-		Params: mcp.CallToolRequestParams{
+		Params: mcp.CallToolParams{
 			Arguments: args,
 		},
 	}
@@ -204,7 +203,7 @@ func TestToolRegistration_GetAllowedSources(t *testing.T) {
 	}
 
 	request := mcp.CallToolRequest{
-		Params: mcp.CallToolRequestParams{
+		Params: mcp.CallToolParams{
 			Arguments: args,
 		},
 	}
@@ -228,7 +227,7 @@ func TestToolRegistration_GetAllowedSources(t *testing.T) {
 func TestToolRegistration_EmptyArguments(t *testing.T) {
 	// Test handling of empty arguments
 	request := mcp.CallToolRequest{
-		Params: mcp.CallToolRequestParams{
+		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{},
 		},
 	}
@@ -248,7 +247,7 @@ func TestToolRegistration_EmptyArguments(t *testing.T) {
 func TestToolRegistration_NilArguments(t *testing.T) {
 	// Test handling of nil arguments
 	request := mcp.CallToolRequest{
-		Params: mcp.CallToolRequestParams{
+		Params: mcp.CallToolParams{
 			Arguments: nil,
 		},
 	}

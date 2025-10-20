@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/christianhuening/linkerd-mcp/internal/testutil"
+	"github.com/mark3labs/mcp-go/mcp"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -26,7 +27,11 @@ func TestListMeshedServices_WithMeshedPods(t *testing.T) {
 	}
 
 	var response map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &response); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 
@@ -88,7 +93,11 @@ func TestListMeshedServices_FilterByNamespace(t *testing.T) {
 	}
 
 	var response map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &response); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 
@@ -120,7 +129,11 @@ func TestListMeshedServices_NoMeshedPods(t *testing.T) {
 	}
 
 	var response map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &response); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 
@@ -145,7 +158,11 @@ func TestListMeshedServices_PodsWithoutAppLabel(t *testing.T) {
 	}
 
 	var response map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &response); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 
@@ -170,7 +187,11 @@ func TestListMeshedServices_K8sAppLabel(t *testing.T) {
 	}
 
 	var response map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &response); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 
@@ -205,7 +226,11 @@ func TestListMeshedServices_MultiplePodsPerService(t *testing.T) {
 	}
 
 	var response map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &response); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 

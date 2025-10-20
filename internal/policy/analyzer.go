@@ -12,12 +12,12 @@ import (
 
 // Analyzer provides Linkerd policy analysis functionality
 type Analyzer struct {
-	clientset     *kubernetes.Clientset
+	clientset     kubernetes.Interface
 	dynamicClient dynamic.Interface
 }
 
 // NewAnalyzer creates a new policy analyzer
-func NewAnalyzer(clientset *kubernetes.Clientset, dynamicClient dynamic.Interface) *Analyzer {
+func NewAnalyzer(clientset kubernetes.Interface, dynamicClient dynamic.Interface) *Analyzer {
 	return &Analyzer{
 		clientset:     clientset,
 		dynamicClient: dynamicClient,

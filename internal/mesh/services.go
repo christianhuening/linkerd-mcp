@@ -12,11 +12,11 @@ import (
 
 // ServiceLister provides functionality for listing meshed services
 type ServiceLister struct {
-	clientset *kubernetes.Clientset
+	clientset kubernetes.Interface
 }
 
 // NewServiceLister creates a new service lister
-func NewServiceLister(clientset *kubernetes.Clientset) *ServiceLister {
+func NewServiceLister(clientset kubernetes.Interface) *ServiceLister {
 	return &ServiceLister{
 		clientset: clientset,
 	}

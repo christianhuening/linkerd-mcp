@@ -12,11 +12,11 @@ import (
 
 // Checker provides health checking functionality for Linkerd mesh
 type Checker struct {
-	clientset *kubernetes.Clientset
+	clientset kubernetes.Interface
 }
 
 // NewChecker creates a new health checker
-func NewChecker(clientset *kubernetes.Clientset) *Checker {
+func NewChecker(clientset kubernetes.Interface) *Checker {
 	return &Checker{
 		clientset: clientset,
 	}

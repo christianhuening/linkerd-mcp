@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/christianhuening/linkerd-mcp/internal/testutil"
+	"github.com/mark3labs/mcp-go/mcp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -72,7 +73,11 @@ func TestCheckMeshHealth_UnhealthyControlPlane(t *testing.T) {
 	}
 
 	var healthStatus map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &healthStatus); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &healthStatus); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 
@@ -124,7 +129,11 @@ func TestCheckMeshHealth_EmptyNamespaceDefaultsToLinkerd(t *testing.T) {
 	}
 
 	var healthStatus map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &healthStatus); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &healthStatus); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 
@@ -145,7 +154,11 @@ func TestCheckMeshHealth_NoControlPlanePods(t *testing.T) {
 	}
 
 	var healthStatus map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &healthStatus); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &healthStatus); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 
@@ -174,7 +187,11 @@ func TestCheckMeshHealth_CustomNamespace(t *testing.T) {
 	}
 
 	var healthStatus map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Content[0].Text), &healthStatus); err != nil {
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok {
+		t.Fatal("Expected text content")
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), &healthStatus); err != nil {
 		t.Fatalf("Failed to parse result: %v", err)
 	}
 

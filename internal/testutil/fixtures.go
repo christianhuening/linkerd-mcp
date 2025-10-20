@@ -86,6 +86,12 @@ func CreateLinkerdControlPlanePod(name, namespace, component string, phase corev
 
 // CreateServer creates a Linkerd Server CRD
 func CreateServer(name, namespace string, podLabels map[string]string, port int64) *unstructured.Unstructured {
+	// Convert podLabels to map[string]interface{} for proper deep copy support
+	matchLabels := make(map[string]interface{})
+	for k, v := range podLabels {
+		matchLabels[k] = v
+	}
+
 	server := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "policy.linkerd.io/v1beta3",
@@ -96,7 +102,7 @@ func CreateServer(name, namespace string, podLabels map[string]string, port int6
 			},
 			"spec": map[string]interface{}{
 				"podSelector": map[string]interface{}{
-					"matchLabels": podLabels,
+					"matchLabels": matchLabels,
 				},
 				"port": port,
 			},
