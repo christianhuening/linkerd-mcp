@@ -138,11 +138,17 @@ func TestGetAllowedTargets_WithPods(t *testing.T) {
 
 	// Add source pod
 	pod := testutil.CreatePod("frontend-1", "prod", "frontend-sa", map[string]string{"app": "frontend"}, "Running", true)
-	kubeClient.CoreV1().Pods("prod").Create(context.Background(), pod, metav1.CreateOptions{})
+	_, err := kubeClient.CoreV1().Pods("prod").Create(context.Background(), pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
 
 	// Add Server CRD
 	server := testutil.CreateServer("backend-server", "prod", map[string]string{"app": "backend"}, 8080)
-	dynamicClient.Resource(serverGVR).Namespace("prod").Create(context.Background(), server, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(serverGVR).Namespace("prod").Create(context.Background(), server, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
 
 	// Add AuthorizationPolicy
 	authPolicy := testutil.CreateAuthorizationPolicy(
@@ -151,7 +157,10 @@ func TestGetAllowedTargets_WithPods(t *testing.T) {
 		"backend-server",
 		[]map[string]string{{"name": "frontend-auth", "kind": "MeshTLSAuthentication"}},
 	)
-	dynamicClient.Resource(authPolicyGVR).Namespace("prod").Create(context.Background(), authPolicy, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(authPolicyGVR).Namespace("prod").Create(context.Background(), authPolicy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create authorization policy: %v", err)
+	}
 
 	// Add MeshTLSAuthentication allowing frontend
 	meshAuth := testutil.CreateMeshTLSAuthentication(
@@ -160,7 +169,10 @@ func TestGetAllowedTargets_WithPods(t *testing.T) {
 		[]string{"frontend-sa.prod.serviceaccount.identity.linkerd.cluster.local"},
 		nil,
 	)
-	dynamicClient.Resource(meshTLSAuthGVR).Namespace("prod").Create(context.Background(), meshAuth, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(meshTLSAuthGVR).Namespace("prod").Create(context.Background(), meshAuth, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create mesh TLS authentication: %v", err)
+	}
 
 	result, err := analyzer.GetAllowedTargets(context.Background(), "prod", "frontend")
 
@@ -214,7 +226,10 @@ func TestGetAllowedSources_WithServersAndPolicies(t *testing.T) {
 
 	// Add Server for backend
 	server := testutil.CreateServer("backend-server", "prod", map[string]string{"app": "backend"}, 8080)
-	dynamicClient.Resource(serverGVR).Namespace("prod").Create(context.Background(), server, metav1.CreateOptions{})
+	_, err := dynamicClient.Resource(serverGVR).Namespace("prod").Create(context.Background(), server, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
 
 	// Add AuthorizationPolicy
 	authPolicy := testutil.CreateAuthorizationPolicy(
@@ -223,7 +238,10 @@ func TestGetAllowedSources_WithServersAndPolicies(t *testing.T) {
 		"backend-server",
 		[]map[string]string{{"name": "all-auth", "kind": "MeshTLSAuthentication"}},
 	)
-	dynamicClient.Resource(authPolicyGVR).Namespace("prod").Create(context.Background(), authPolicy, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(authPolicyGVR).Namespace("prod").Create(context.Background(), authPolicy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create authorization policy: %v", err)
+	}
 
 	// Add MeshTLSAuthentication with wildcard
 	meshAuth := testutil.CreateMeshTLSAuthentication(
@@ -232,7 +250,10 @@ func TestGetAllowedSources_WithServersAndPolicies(t *testing.T) {
 		[]string{"*"},
 		nil,
 	)
-	dynamicClient.Resource(meshTLSAuthGVR).Namespace("prod").Create(context.Background(), meshAuth, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(meshTLSAuthGVR).Namespace("prod").Create(context.Background(), meshAuth, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create mesh TLS authentication: %v", err)
+	}
 
 	result, err := analyzer.GetAllowedSources(context.Background(), "prod", "backend")
 
@@ -280,7 +301,10 @@ func TestGetAllowedSources_WithServiceAccounts(t *testing.T) {
 
 	// Add Server
 	server := testutil.CreateServer("api-server", "prod", map[string]string{"app": "api"}, 8080)
-	dynamicClient.Resource(serverGVR).Namespace("prod").Create(context.Background(), server, metav1.CreateOptions{})
+	_, err := dynamicClient.Resource(serverGVR).Namespace("prod").Create(context.Background(), server, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
 
 	// Add AuthorizationPolicy
 	authPolicy := testutil.CreateAuthorizationPolicy(
@@ -289,7 +313,10 @@ func TestGetAllowedSources_WithServiceAccounts(t *testing.T) {
 		"api-server",
 		[]map[string]string{{"name": "frontend-auth", "kind": "MeshTLSAuthentication"}},
 	)
-	dynamicClient.Resource(authPolicyGVR).Namespace("prod").Create(context.Background(), authPolicy, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(authPolicyGVR).Namespace("prod").Create(context.Background(), authPolicy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create authorization policy: %v", err)
+	}
 
 	// Add MeshTLSAuthentication with service accounts
 	meshAuth := testutil.CreateMeshTLSAuthentication(
@@ -301,7 +328,10 @@ func TestGetAllowedSources_WithServiceAccounts(t *testing.T) {
 			{"name": "admin-sa", "namespace": "admin"},
 		},
 	)
-	dynamicClient.Resource(meshTLSAuthGVR).Namespace("prod").Create(context.Background(), meshAuth, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(meshTLSAuthGVR).Namespace("prod").Create(context.Background(), meshAuth, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create mesh TLS authentication: %v", err)
+	}
 
 	result, err := analyzer.GetAllowedSources(context.Background(), "prod", "api")
 

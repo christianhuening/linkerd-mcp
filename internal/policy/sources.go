@@ -118,19 +118,20 @@ func (a *Analyzer) extractSourcesFromAuth(ctx context.Context, namespace, authNa
 	sources := make(map[string]map[string]interface{})
 
 	var authGVR schema.GroupVersionResource
-	if authKind == "MeshTLSAuthentication" {
+	switch authKind {
+	case "MeshTLSAuthentication":
 		authGVR = schema.GroupVersionResource{
 			Group:    "policy.linkerd.io",
 			Version:  "v1alpha1",
 			Resource: "meshtlsauthentications",
 		}
-	} else if authKind == "NetworkAuthentication" {
+	case "NetworkAuthentication":
 		authGVR = schema.GroupVersionResource{
 			Group:    "policy.linkerd.io",
 			Version:  "v1alpha1",
 			Resource: "networkauthentications",
 		}
-	} else {
+	default:
 		return sources
 	}
 
