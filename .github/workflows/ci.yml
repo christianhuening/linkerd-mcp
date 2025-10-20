@@ -154,8 +154,7 @@ jobs:
     name: Security Scan
     permissions:
       contents: read
-      packages: write
-      id-token: write
+      actions: read
       security-events: write
     runs-on: ubuntu-latest
     steps:
