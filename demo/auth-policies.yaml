@@ -1,0 +1,181 @@
+---
+# MeshTLS Authentication: Frontend can access API Gateway
+apiVersion: policy.linkerd.io/v1alpha1
+kind: MeshTLSAuthentication
+metadata:
+  name: frontend-clients
+  namespace: demo-app
+spec:
+  identities:
+    - "frontend.demo-app.serviceaccount.identity.linkerd.cluster.local"
+---
+# Authorization Policy: API Gateway allows Frontend
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
+metadata:
+  name: api-gateway-policy
+  namespace: demo-app
+spec:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
+    name: api-gateway-server
+  requiredAuthenticationRefs:
+    - name: frontend-clients
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io
+---
+# MeshTLS Authentication: API Gateway can access backend services
+apiVersion: policy.linkerd.io/v1alpha1
+kind: MeshTLSAuthentication
+metadata:
+  name: api-gateway-client
+  namespace: demo-app
+spec:
+  identities:
+    - "api-gateway.demo-app.serviceaccount.identity.linkerd.cluster.local"
+---
+# Authorization Policy: Catalog allows API Gateway
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
+metadata:
+  name: catalog-policy
+  namespace: demo-app
+spec:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
+    name: catalog-server
+  requiredAuthenticationRefs:
+    - name: api-gateway-client
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io
+---
+# Authorization Policy: Cart allows API Gateway
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
+metadata:
+  name: cart-policy-gateway
+  namespace: demo-app
+spec:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
+    name: cart-server
+  requiredAuthenticationRefs:
+    - name: api-gateway-client
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io
+---
+# Authorization Policy: Checkout allows API Gateway
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
+metadata:
+  name: checkout-policy-gateway
+  namespace: demo-app
+spec:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
+    name: checkout-server
+  requiredAuthenticationRefs:
+    - name: api-gateway-client
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io
+---
+# MeshTLS Authentication: Cart can access Catalog
+apiVersion: policy.linkerd.io/v1alpha1
+kind: MeshTLSAuthentication
+metadata:
+  name: cart-client
+  namespace: demo-app
+spec:
+  identities:
+    - "cart.demo-app.serviceaccount.identity.linkerd.cluster.local"
+---
+# Authorization Policy: Catalog also allows Cart
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
+metadata:
+  name: catalog-policy-cart
+  namespace: demo-app
+spec:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
+    name: catalog-server
+  requiredAuthenticationRefs:
+    - name: cart-client
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io
+---
+# MeshTLS Authentication: Checkout can access Cart and Payment
+apiVersion: policy.linkerd.io/v1alpha1
+kind: MeshTLSAuthentication
+metadata:
+  name: checkout-client
+  namespace: demo-app
+spec:
+  identities:
+    - "checkout.demo-app.serviceaccount.identity.linkerd.cluster.local"
+---
+# Authorization Policy: Cart allows Checkout
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
+metadata:
+  name: cart-policy-checkout
+  namespace: demo-app
+spec:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
+    name: cart-server
+  requiredAuthenticationRefs:
+    - name: checkout-client
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io
+---
+# Authorization Policy: Payment allows ONLY Checkout
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
+metadata:
+  name: payment-policy
+  namespace: demo-app
+spec:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
+    name: payment-server
+  requiredAuthenticationRefs:
+    - name: checkout-client
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io
+---
+# MeshTLS Authentication: Backend services can access Database
+apiVersion: policy.linkerd.io/v1alpha1
+kind: MeshTLSAuthentication
+metadata:
+  name: database-clients
+  namespace: demo-app
+spec:
+  identities:
+    - "catalog.demo-app.serviceaccount.identity.linkerd.cluster.local"
+    - "cart.demo-app.serviceaccount.identity.linkerd.cluster.local"
+    - "checkout.demo-app.serviceaccount.identity.linkerd.cluster.local"
+    - "payment.demo-app.serviceaccount.identity.linkerd.cluster.local"
+---
+# Authorization Policy: Database allows backend services
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
+metadata:
+  name: database-policy
+  namespace: demo-app
+spec:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
+    name: database-server
+  requiredAuthenticationRefs:
+    - name: database-clients
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io

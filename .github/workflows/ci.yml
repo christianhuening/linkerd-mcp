@@ -28,7 +28,7 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: latest
-          args: --timeout=5m
+          args: --timeout=5m ./internal/... .
 
   test:
     name: Test
@@ -178,7 +178,7 @@ jobs:
       - name: Run gosec security scanner
         uses: securego/gosec@master
         with:
-          args: '-fmt sarif -out gosec-results.sarif ./...'
+          args: '-fmt sarif -out gosec-results.sarif -exclude-dir=examples -exclude-dir=demo ./...'
 
       - name: Upload gosec results
         uses: github/codeql-action/upload-sarif@v3

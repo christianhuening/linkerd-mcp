@@ -1,0 +1,78 @@
+---
+# Server for API Gateway
+apiVersion: policy.linkerd.io/v1beta3
+kind: Server
+metadata:
+  name: api-gateway-server
+  namespace: demo-app
+spec:
+  podSelector:
+    matchLabels:
+      app: api-gateway
+  port: http
+  proxyProtocol: HTTP/1
+---
+# Server for Catalog
+apiVersion: policy.linkerd.io/v1beta3
+kind: Server
+metadata:
+  name: catalog-server
+  namespace: demo-app
+spec:
+  podSelector:
+    matchLabels:
+      app: catalog
+  port: http
+  proxyProtocol: HTTP/1
+---
+# Server for Cart
+apiVersion: policy.linkerd.io/v1beta3
+kind: Server
+metadata:
+  name: cart-server
+  namespace: demo-app
+spec:
+  podSelector:
+    matchLabels:
+      app: cart
+  port: http
+  proxyProtocol: HTTP/1
+---
+# Server for Checkout
+apiVersion: policy.linkerd.io/v1beta3
+kind: Server
+metadata:
+  name: checkout-server
+  namespace: demo-app
+spec:
+  podSelector:
+    matchLabels:
+      app: checkout
+  port: http
+  proxyProtocol: HTTP/1
+---
+# Server for Payment
+apiVersion: policy.linkerd.io/v1beta3
+kind: Server
+metadata:
+  name: payment-server
+  namespace: demo-app
+spec:
+  podSelector:
+    matchLabels:
+      app: payment
+  port: http
+  proxyProtocol: HTTP/1
+---
+# Server for Database
+apiVersion: policy.linkerd.io/v1beta3
+kind: Server
+metadata:
+  name: database-server
+  namespace: demo-app
+spec:
+  podSelector:
+    matchLabels:
+      app: database
+  port: postgres
+  proxyProtocol: unknown

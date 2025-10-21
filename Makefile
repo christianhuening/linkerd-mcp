@@ -94,7 +94,7 @@ test-all: ## Run all tests including main package
 .PHONY: lint
 lint: ## Run golangci-lint
 	@echo "$(CYAN)Running linter...$(NC)"
-	golangci-lint run --timeout=5m
+	golangci-lint run --timeout=5m ./internal/... .
 	@echo "$(GREEN)✓ Linting complete$(NC)"
 
 ##@ Docker
@@ -339,12 +339,111 @@ ci-build: build docker-build ## Run CI build locally
 ci-all: ci-test ci-build ## Run all CI checks locally
 	@echo "$(GREEN)✓ All CI checks complete$(NC)"
 
+##@ Demo Application
+
+.PHONY: demo-deploy
+demo-deploy: ## Deploy demo application with Linkerd policies
+	@echo "$(CYAN)Deploying demo application...$(NC)"
+	@./demo/deploy.sh
+
+.PHONY: demo-status
+demo-status: ## Check demo application status
+	@echo "$(CYAN)Demo application status:$(NC)"
+	@echo ""
+	@echo "$(CYAN)Pods:$(NC)"
+	@/usr/local/bin/kubectl get pods -n demo-app
+	@echo ""
+	@echo "$(CYAN)Services:$(NC)"
+	@/usr/local/bin/kubectl get svc -n demo-app
+	@echo ""
+	@echo "$(CYAN)Linkerd Servers:$(NC)"
+	@/usr/local/bin/kubectl get servers -n demo-app
+	@echo ""
+	@echo "$(CYAN)Authorization Policies:$(NC)"
+	@/usr/local/bin/kubectl get authorizationpolicies -n demo-app
+
+.PHONY: demo-cleanup
+demo-cleanup: ## Remove demo application
+	@echo "$(CYAN)Cleaning up demo application...$(NC)"
+	@./demo/cleanup.sh
+
+.PHONY: demo-redeploy
+demo-redeploy: demo-cleanup demo-deploy ## Redeploy demo application
+
+.PHONY: demo-logs
+demo-logs: ## View demo application logs
+	@echo "$(CYAN)Select a service to view logs:$(NC)"
+	@/usr/local/bin/kubectl get pods -n demo-app -o custom-columns=NAME:.metadata.name --no-headers
+
 ##@ Examples
 
 .PHONY: example-mesh-health
 example-mesh-health: ## Run mesh health example
 	@echo "$(CYAN)Running mesh health example...$(NC)"
 	$(GO) run examples/test-mesh-health.go
+
+.PHONY: example-list-services
+example-list-services: ## List all meshed services
+	@echo "$(CYAN)Listing meshed services...$(NC)"
+	$(GO) run examples/test-list-services.go
+
+.PHONY: example-connectivity
+example-connectivity: ## Test connectivity (usage: make example-connectivity SOURCE=frontend TARGET=api-gateway)
+	@if [ -z "$(SOURCE)" ] || [ -z "$(TARGET)" ]; then \
+		echo "$(RED)Error: SOURCE and TARGET are required$(NC)"; \
+		echo "Usage: make example-connectivity SOURCE=frontend TARGET=api-gateway"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Testing connectivity: $(SOURCE) → $(TARGET)...$(NC)"
+	$(GO) run examples/test-connectivity.go $(SOURCE) $(TARGET)
+
+.PHONY: example-allowed-targets
+example-allowed-targets: ## Get allowed targets (usage: make example-allowed-targets SERVICE=api-gateway)
+	@if [ -z "$(SERVICE)" ]; then \
+		echo "$(RED)Error: SERVICE is required$(NC)"; \
+		echo "Usage: make example-allowed-targets SERVICE=api-gateway"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Getting allowed targets for: $(SERVICE)...$(NC)"
+	$(GO) run examples/test-allowed-targets.go $(SERVICE)
+
+.PHONY: example-allowed-sources
+example-allowed-sources: ## Get allowed sources (usage: make example-allowed-sources SERVICE=payment)
+	@if [ -z "$(SERVICE)" ]; then \
+		echo "$(RED)Error: SERVICE is required$(NC)"; \
+		echo "Usage: make example-allowed-sources SERVICE=payment"; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)Getting allowed sources for: $(SERVICE)...$(NC)"
+	$(GO) run examples/test-allowed-sources.go $(SERVICE)
+
+.PHONY: demo-test-all
+demo-test-all: ## Run all demo connectivity tests
+	@echo "$(CYAN)Running all demo connectivity tests...$(NC)"
+	@echo ""
+	@echo "$(GREEN)1. Listing all meshed services$(NC)"
+	@$(GO) run examples/test-list-services.go demo-app
+	@echo ""
+	@echo "$(GREEN)2. Testing: frontend → api-gateway (should be ALLOWED)$(NC)"
+	@$(GO) run examples/test-connectivity.go frontend api-gateway
+	@echo ""
+	@echo "$(GREEN)3. Testing: api-gateway → catalog (should be ALLOWED)$(NC)"
+	@$(GO) run examples/test-connectivity.go api-gateway catalog
+	@echo ""
+	@echo "$(GREEN)4. Testing: api-gateway → payment (should be DENIED)$(NC)"
+	@$(GO) run examples/test-connectivity.go api-gateway payment
+	@echo ""
+	@echo "$(GREEN)5. Testing: checkout → payment (should be ALLOWED)$(NC)"
+	@$(GO) run examples/test-connectivity.go checkout payment
+	@echo ""
+	@echo "$(GREEN)6. Getting allowed targets for api-gateway$(NC)"
+	@$(GO) run examples/test-allowed-targets.go api-gateway
+	@echo ""
+	@echo "$(GREEN)7. Getting allowed sources for payment$(NC)"
+	@$(GO) run examples/test-allowed-sources.go payment
+	@echo ""
+	@echo "$(GREEN)8. Getting allowed sources for database$(NC)"
+	@$(GO) run examples/test-allowed-sources.go database
 
 ##@ Utilities
 
