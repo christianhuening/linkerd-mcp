@@ -339,6 +339,13 @@ ci-build: build docker-build ## Run CI build locally
 ci-all: ci-test ci-build ## Run all CI checks locally
 	@echo "$(GREEN)✓ All CI checks complete$(NC)"
 
+##@ Examples
+
+.PHONY: example-mesh-health
+example-mesh-health: ## Run mesh health example
+	@echo "$(CYAN)Running mesh health example...$(NC)"
+	$(GO) run examples/test-mesh-health.go
+
 ##@ Utilities
 
 .PHONY: deps
