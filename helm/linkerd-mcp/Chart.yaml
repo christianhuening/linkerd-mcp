@@ -1,0 +1,19 @@
+apiVersion: v2
+name: linkerd-mcp
+description: A Model Context Protocol (MCP) server for Linkerd service mesh observability and analysis
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+home: https://github.com/christianhuening/linkerd-mcp
+sources:
+  - https://github.com/christianhuening/linkerd-mcp
+keywords:
+  - linkerd
+  - mcp
+  - service-mesh
+  - observability
+  - model-context-protocol
+maintainers:
+  - name: Christian Huening
+dependencies: []
+kubeVersion: ">=1.29.0"
