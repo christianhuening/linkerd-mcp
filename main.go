@@ -21,7 +21,7 @@ func main() {
 		log.Fatalf("Failed to initialize Linkerd MCP server: %v", err)
 	}
 
-	// Create MCP server
+	// Create MCP server with tool capabilities
 	s := mcpserver.NewMCPServer(
 		"linkerd-mcp",
 		"1.0.0",
@@ -58,13 +58,14 @@ func main() {
 		}
 	})
 
-	// Create SSE server for MCP protocol
-	sseServer := mcpserver.NewSSEServer(s)
+	// Create StreamableHTTP server for MCP protocol (replaces deprecated SSE)
+	// This mounts the MCP endpoints at /mcp/*
+	streamableServer := mcpserver.NewStreamableHTTPServer(s)
 
-	// Mount SSE server at /sse endpoint
-	mux.Handle("/sse", sseServer)
+	// Mount StreamableHTTP server at /mcp
+	mux.Handle("/mcp/", http.StripPrefix("/mcp", streamableServer))
 
-	// Create HTTP server
+	// Create HTTP server with timeouts
 	httpServer := &http.Server{
 		Addr:         ":" + port,
 		Handler:      mux,
@@ -77,7 +78,13 @@ func main() {
 	go func() {
 		log.Printf("Starting MCP server on port %s", port)
 		log.Printf("Health check: http://localhost:%s/health", port)
-		log.Printf("MCP SSE endpoint: http://localhost:%s/sse", port)
+		log.Printf("Readiness check: http://localhost:%s/ready", port)
+		log.Printf("MCP StreamableHTTP endpoint: http://localhost:%s/mcp", port)
+		log.Printf("  - POST /mcp/initialize")
+		log.Printf("  - POST /mcp/tools/list")
+		log.Printf("  - POST /mcp/tools/call")
+		log.Printf("  - GET /mcp/health")
+		log.Printf("  - GET /mcp/capabilities")
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %v", err)
 		}

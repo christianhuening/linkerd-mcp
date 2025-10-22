@@ -161,10 +161,10 @@ func TestMCPServerCreation(t *testing.T) {
 	}
 }
 
-// TestSSEEndpoint tests the SSE endpoint basic structure
-func TestSSEEndpoint(t *testing.T) {
+// TestStreamableHTTPEndpoint tests the StreamableHTTP endpoint basic structure
+func TestStreamableHTTPEndpoint(t *testing.T) {
 	// Skip this test in CI as it requires Kubernetes configuration
-	t.Skip("Skipping SSE endpoint test - requires Kubernetes config")
+	t.Skip("Skipping StreamableHTTP endpoint test - requires Kubernetes config")
 
 	linkerdServer, err := server.New()
 	if err != nil {
@@ -179,16 +179,16 @@ func TestSSEEndpoint(t *testing.T) {
 
 	linkerdServer.RegisterTools(s)
 
-	sseServer := mcpserver.NewSSEServer(s)
+	streamableServer := mcpserver.NewStreamableHTTPServer(s)
 
-	// Create a test request
-	req := httptest.NewRequest("GET", "/sse", nil)
+	// Create a test request to /mcp/health endpoint
+	req := httptest.NewRequest("GET", "/health", nil)
 	w := httptest.NewRecorder()
 
 	// Serve the request
-	sseServer.ServeHTTP(w, req)
+	streamableServer.ServeHTTP(w, req)
 
-	// SSE should return 200 OK
+	// StreamableHTTP health endpoint should return 200 OK
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status code %d, got %d", http.StatusOK, w.Code)
 	}

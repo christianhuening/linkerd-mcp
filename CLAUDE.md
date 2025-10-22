@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Model Context Protocol (MCP) server that enables AI agents to interact with Linkerd service mesh in Kubernetes clusters. The server exposes tools for health monitoring, service discovery, and authorization policy analysis.
 
+The server uses **StreamableHTTP transport** (the modern MCP standard as of specification version 2025-03-26), which replaces the deprecated SSE transport.
+
 ## Commands
 
 ### Build & Run
