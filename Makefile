@@ -84,12 +84,12 @@ test-coverage-html: test-coverage ## Generate HTML coverage report
 .PHONY: test-race
 test-race: ## Run tests with race detector
 	@echo "$(CYAN)Running tests with race detector...$(NC)"
-	$(GO) test -v -race ./...
+	$(GO) test -v -race ./internal/... .
 
 .PHONY: test-all
 test-all: ## Run all tests including main package
 	@echo "$(CYAN)Running all tests...$(NC)"
-	$(GO) test -v -race -coverprofile=$(COVERAGE_FILE) ./...
+	$(GO) test -v -race -coverprofile=$(COVERAGE_FILE) ./internal/... .
 
 .PHONY: lint
 lint: ## Run golangci-lint
