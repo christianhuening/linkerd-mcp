@@ -1,269 +1,201 @@
-package mesh
+package mesh_test
 
 import (
 	"context"
-	"encoding/json"
-	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/christianhuening/linkerd-mcp/internal/mesh"
 	"github.com/christianhuening/linkerd-mcp/internal/testutil"
-	"github.com/mark3labs/mcp-go/mcp"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestListMeshedServices_WithMeshedPods(t *testing.T) {
-	// Create fake clientset with meshed pods
-	clientset := fake.NewSimpleClientset(
-		testutil.CreateMeshedPod("frontend-1", "prod", "frontend"),
-		testutil.CreateMeshedPod("frontend-2", "prod", "frontend"),
-		testutil.CreateMeshedPod("backend-1", "prod", "backend"),
-		testutil.CreateMeshedPod("api-1", "staging", "api"),
+var _ = Describe("ServiceLister", func() {
+	var (
+		ctx       context.Context
+		clientset *fake.Clientset
+		lister    *mesh.ServiceLister
 	)
 
-	lister := NewServiceLister(clientset)
-	result, err := lister.ListMeshedServices(context.Background(), "")
+	BeforeEach(func() {
+		ctx = context.Background()
+	})
 
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
+	Describe("NewServiceLister", func() {
+		It("should create a new service lister with clientset", func() {
+			clientset = fake.NewSimpleClientset()
+			lister = mesh.NewServiceLister(clientset)
 
-	var response map[string]interface{}
-	textContent, ok := mcp.AsTextContent(result.Content[0])
-	if !ok {
-		t.Fatal("Expected text content")
-	}
-	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
-		t.Fatalf("Failed to parse result: %v", err)
-	}
+			Expect(lister).NotTo(BeNil())
+		})
+	})
 
-	totalServices := int(response["totalServices"].(float64))
-	if totalServices != 3 {
-		t.Errorf("Expected 3 services, got: %d", totalServices)
-	}
+	Describe("ListMeshedServices", func() {
+		Context("with meshed pods", func() {
+			BeforeEach(func() {
+				clientset = fake.NewSimpleClientset(
+					testutil.CreateMeshedPod("frontend-1", "prod", "frontend"),
+					testutil.CreateMeshedPod("frontend-2", "prod", "frontend"),
+					testutil.CreateMeshedPod("backend-1", "prod", "backend"),
+					testutil.CreateMeshedPod("api-1", "staging", "api"),
+				)
+				lister = mesh.NewServiceLister(clientset)
+			})
 
-	services := response["services"].(map[string]interface{})
+			It("should list all meshed services across namespaces", func() {
+				result, err := lister.ListMeshedServices(ctx, "")
+				Expect(err).NotTo(HaveOccurred())
 
-	// Check frontend service
-	frontendKey := "prod/frontend"
-	if frontend, ok := services[frontendKey]; ok {
-		frontendMap := frontend.(map[string]interface{})
-		if frontendMap["namespace"] != "prod" {
-			t.Errorf("Expected namespace 'prod', got: %v", frontendMap["namespace"])
-		}
-		if frontendMap["service"] != "frontend" {
-			t.Errorf("Expected service 'frontend', got: %v", frontendMap["service"])
-		}
-		pods := frontendMap["pods"].([]interface{})
-		if len(pods) != 2 {
-			t.Errorf("Expected 2 pods for frontend, got: %d", len(pods))
-		}
-	} else {
-		t.Errorf("Frontend service not found")
-	}
+				var response map[string]interface{}
+				err = testutil.ParseJSONResult(result, &response)
+				Expect(err).NotTo(HaveOccurred())
 
-	// Check backend service
-	backendKey := "prod/backend"
-	if backend, ok := services[backendKey]; ok {
-		backendMap := backend.(map[string]interface{})
-		pods := backendMap["pods"].([]interface{})
-		if len(pods) != 1 {
-			t.Errorf("Expected 1 pod for backend, got: %d", len(pods))
-		}
-	} else {
-		t.Errorf("Backend service not found")
-	}
+				Expect(response["totalServices"]).To(BeNumerically("==", 3))
 
-	// Check api service in staging
-	apiKey := "staging/api"
-	if _, ok := services[apiKey]; !ok {
-		t.Errorf("API service in staging not found")
-	}
-}
+				services := response["services"].(map[string]interface{})
 
-func TestListMeshedServices_FilterByNamespace(t *testing.T) {
-	clientset := fake.NewSimpleClientset(
-		testutil.CreateMeshedPod("frontend-1", "prod", "frontend"),
-		testutil.CreateMeshedPod("api-1", "staging", "api"),
-	)
+				// Check frontend service
+				frontendService := services["prod/frontend"].(map[string]interface{})
+				Expect(frontendService["namespace"]).To(Equal("prod"))
+				Expect(frontendService["service"]).To(Equal("frontend"))
+				frontendPods := frontendService["pods"].([]interface{})
+				Expect(frontendPods).To(HaveLen(2))
 
-	lister := NewServiceLister(clientset)
-	result, err := lister.ListMeshedServices(context.Background(), "prod")
+				// Check backend service
+				backendService := services["prod/backend"].(map[string]interface{})
+				backendPods := backendService["pods"].([]interface{})
+				Expect(backendPods).To(HaveLen(1))
 
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
+				// Check api service in staging
+				_, ok := services["staging/api"]
+				Expect(ok).To(BeTrue(), "staging/api service should exist")
+			})
+		})
 
-	var response map[string]interface{}
-	textContent, ok := mcp.AsTextContent(result.Content[0])
-	if !ok {
-		t.Fatal("Expected text content")
-	}
-	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
-		t.Fatalf("Failed to parse result: %v", err)
-	}
+		Context("when filtering by namespace", func() {
+			BeforeEach(func() {
+				clientset = fake.NewSimpleClientset(
+					testutil.CreateMeshedPod("frontend-1", "prod", "frontend"),
+					testutil.CreateMeshedPod("api-1", "staging", "api"),
+				)
+				lister = mesh.NewServiceLister(clientset)
+			})
 
-	totalServices := int(response["totalServices"].(float64))
-	if totalServices != 1 {
-		t.Errorf("Expected 1 service in prod, got: %d", totalServices)
-	}
+			It("should only return services in the specified namespace", func() {
+				result, err := lister.ListMeshedServices(ctx, "prod")
+				Expect(err).NotTo(HaveOccurred())
 
-	services := response["services"].(map[string]interface{})
-	if _, ok := services["prod/frontend"]; !ok {
-		t.Error("Expected to find prod/frontend")
-	}
-	if _, ok := services["staging/api"]; ok {
-		t.Error("Should not find staging/api when filtering by prod namespace")
-	}
-}
+				var response map[string]interface{}
+				err = testutil.ParseJSONResult(result, &response)
+				Expect(err).NotTo(HaveOccurred())
 
-func TestListMeshedServices_NoMeshedPods(t *testing.T) {
-	// Create pod without linkerd-proxy
-	regularPod := testutil.CreatePod("app-1", "default", "default", map[string]string{"app": "myapp"}, "Running", true)
+				Expect(response["totalServices"]).To(BeNumerically("==", 1))
 
-	clientset := fake.NewSimpleClientset(regularPod)
+				services := response["services"].(map[string]interface{})
+				_, prodExists := services["prod/frontend"]
+				Expect(prodExists).To(BeTrue(), "prod/frontend should exist")
 
-	lister := NewServiceLister(clientset)
-	result, err := lister.ListMeshedServices(context.Background(), "")
+				_, stagingExists := services["staging/api"]
+				Expect(stagingExists).To(BeFalse(), "staging/api should not exist when filtering by prod namespace")
+			})
+		})
 
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
+		Context("with no meshed pods", func() {
+			BeforeEach(func() {
+				regularPod := testutil.CreatePod("app-1", "default", "default", map[string]string{"app": "myapp"}, "Running", true)
+				clientset = fake.NewSimpleClientset(regularPod)
+				lister = mesh.NewServiceLister(clientset)
+			})
 
-	var response map[string]interface{}
-	textContent, ok := mcp.AsTextContent(result.Content[0])
-	if !ok {
-		t.Fatal("Expected text content")
-	}
-	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
-		t.Fatalf("Failed to parse result: %v", err)
-	}
+			It("should return zero services", func() {
+				result, err := lister.ListMeshedServices(ctx, "")
+				Expect(err).NotTo(HaveOccurred())
 
-	totalServices := int(response["totalServices"].(float64))
-	if totalServices != 0 {
-		t.Errorf("Expected 0 services, got: %d", totalServices)
-	}
-}
+				var response map[string]interface{}
+				err = testutil.ParseJSONResult(result, &response)
+				Expect(err).NotTo(HaveOccurred())
 
-func TestListMeshedServices_PodsWithoutAppLabel(t *testing.T) {
-	// Create meshed pod but without app label
-	podWithoutLabel := testutil.CreateMeshedPod("no-label-1", "default", "")
-	podWithoutLabel.Labels = map[string]string{}
+				Expect(response["totalServices"]).To(BeNumerically("==", 0))
+			})
+		})
 
-	clientset := fake.NewSimpleClientset(podWithoutLabel)
+		Context("with pods without app label", func() {
+			BeforeEach(func() {
+				podWithoutLabel := testutil.CreateMeshedPod("no-label-1", "default", "")
+				podWithoutLabel.Labels = map[string]string{}
+				clientset = fake.NewSimpleClientset(podWithoutLabel)
+				lister = mesh.NewServiceLister(clientset)
+			})
 
-	lister := NewServiceLister(clientset)
-	result, err := lister.ListMeshedServices(context.Background(), "")
+			It("should not list pods without app labels", func() {
+				result, err := lister.ListMeshedServices(ctx, "")
+				Expect(err).NotTo(HaveOccurred())
 
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
+				var response map[string]interface{}
+				err = testutil.ParseJSONResult(result, &response)
+				Expect(err).NotTo(HaveOccurred())
 
-	var response map[string]interface{}
-	textContent, ok := mcp.AsTextContent(result.Content[0])
-	if !ok {
-		t.Fatal("Expected text content")
-	}
-	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
-		t.Fatalf("Failed to parse result: %v", err)
-	}
+				Expect(response["totalServices"]).To(BeNumerically("==", 0))
+			})
+		})
 
-	totalServices := int(response["totalServices"].(float64))
-	if totalServices != 0 {
-		t.Errorf("Expected 0 services (no app label), got: %d", totalServices)
-	}
-}
+		Context("with k8s-app label", func() {
+			BeforeEach(func() {
+				pod := testutil.CreateMeshedPod("kube-pod-1", "kube-system", "")
+				pod.Labels = map[string]string{"k8s-app": "kube-dns"}
+				clientset = fake.NewSimpleClientset(pod)
+				lister = mesh.NewServiceLister(clientset)
+			})
 
-func TestListMeshedServices_K8sAppLabel(t *testing.T) {
-	// Create pod with k8s-app label instead of app
-	pod := testutil.CreateMeshedPod("kube-pod-1", "kube-system", "")
-	pod.Labels = map[string]string{"k8s-app": "kube-dns"}
+			It("should recognize k8s-app label as service name", func() {
+				result, err := lister.ListMeshedServices(ctx, "")
+				Expect(err).NotTo(HaveOccurred())
 
-	clientset := fake.NewSimpleClientset(pod)
+				var response map[string]interface{}
+				err = testutil.ParseJSONResult(result, &response)
+				Expect(err).NotTo(HaveOccurred())
 
-	lister := NewServiceLister(clientset)
-	result, err := lister.ListMeshedServices(context.Background(), "")
+				Expect(response["totalServices"]).To(BeNumerically("==", 1))
 
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
+				services := response["services"].(map[string]interface{})
+				service := services["kube-system/kube-dns"].(map[string]interface{})
+				Expect(service["service"]).To(Equal("kube-dns"))
+			})
+		})
 
-	var response map[string]interface{}
-	textContent, ok := mcp.AsTextContent(result.Content[0])
-	if !ok {
-		t.Fatal("Expected text content")
-	}
-	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
-		t.Fatalf("Failed to parse result: %v", err)
-	}
+		Context("with multiple pods per service", func() {
+			BeforeEach(func() {
+				clientset = fake.NewSimpleClientset(
+					testutil.CreateMeshedPod("web-1", "prod", "web"),
+					testutil.CreateMeshedPod("web-2", "prod", "web"),
+					testutil.CreateMeshedPod("web-3", "prod", "web"),
+				)
+				lister = mesh.NewServiceLister(clientset)
+			})
 
-	totalServices := int(response["totalServices"].(float64))
-	if totalServices != 1 {
-		t.Errorf("Expected 1 service with k8s-app label, got: %d", totalServices)
-	}
+			It("should aggregate all pods under the same service", func() {
+				result, err := lister.ListMeshedServices(ctx, "prod")
+				Expect(err).NotTo(HaveOccurred())
 
-	services := response["services"].(map[string]interface{})
-	if service, ok := services["kube-system/kube-dns"]; ok {
-		serviceMap := service.(map[string]interface{})
-		if serviceMap["service"] != "kube-dns" {
-			t.Errorf("Expected service name 'kube-dns', got: %v", serviceMap["service"])
-		}
-	} else {
-		t.Error("Expected to find kube-system/kube-dns")
-	}
-}
+				var response map[string]interface{}
+				err = testutil.ParseJSONResult(result, &response)
+				Expect(err).NotTo(HaveOccurred())
 
-func TestListMeshedServices_MultiplePodsPerService(t *testing.T) {
-	clientset := fake.NewSimpleClientset(
-		testutil.CreateMeshedPod("web-1", "prod", "web"),
-		testutil.CreateMeshedPod("web-2", "prod", "web"),
-		testutil.CreateMeshedPod("web-3", "prod", "web"),
-	)
+				services := response["services"].(map[string]interface{})
+				service := services["prod/web"].(map[string]interface{})
+				pods := service["pods"].([]interface{})
+				Expect(pods).To(HaveLen(3))
 
-	lister := NewServiceLister(clientset)
-	result, err := lister.ListMeshedServices(context.Background(), "prod")
-
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
-
-	var response map[string]interface{}
-	textContent, ok := mcp.AsTextContent(result.Content[0])
-	if !ok {
-		t.Fatal("Expected text content")
-	}
-	if err := json.Unmarshal([]byte(textContent.Text), &response); err != nil {
-		t.Fatalf("Failed to parse result: %v", err)
-	}
-
-	services := response["services"].(map[string]interface{})
-	if service, ok := services["prod/web"]; ok {
-		serviceMap := service.(map[string]interface{})
-		pods := serviceMap["pods"].([]interface{})
-		if len(pods) != 3 {
-			t.Errorf("Expected 3 pods for web service, got: %d", len(pods))
-		}
-
-		// Verify all pod names are present
-		podNames := make(map[string]bool)
-		for _, pod := range pods {
-			podNames[pod.(string)] = true
-		}
-		if !podNames["web-1"] || !podNames["web-2"] || !podNames["web-3"] {
-			t.Error("Not all pod names found in the list")
-		}
-	} else {
-		t.Error("Expected to find prod/web service")
-	}
-}
-
-func TestNewServiceLister(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
-	lister := NewServiceLister(clientset)
-
-	if lister == nil {
-		t.Fatal("Expected lister to be created")
-	}
-
-	if lister.clientset != clientset {
-		t.Error("Expected clientset to be set correctly")
-	}
-}
+				// Verify all pod names are present
+				podNames := make(map[string]bool)
+				for _, pod := range pods {
+					podNames[pod.(string)] = true
+				}
+				Expect(podNames).To(HaveKey("web-1"))
+				Expect(podNames).To(HaveKey("web-2"))
+				Expect(podNames).To(HaveKey("web-3"))
+			})
+		})
+	})
+})

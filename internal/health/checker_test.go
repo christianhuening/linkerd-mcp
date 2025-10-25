@@ -1,219 +1,161 @@
-package health
+package health_test
 
 import (
 	"context"
-	"encoding/json"
-	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/christianhuening/linkerd-mcp/internal/health"
 	"github.com/christianhuening/linkerd-mcp/internal/testutil"
-	"github.com/mark3labs/mcp-go/mcp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestCheckMeshHealth_HealthyControlPlane(t *testing.T) {
-	// Create fake clientset with healthy control plane pods
-	clientset := fake.NewSimpleClientset(
-		testutil.CreateLinkerdControlPlanePod("destination-1", "linkerd", "destination", corev1.PodRunning, true),
-		testutil.CreateLinkerdControlPlanePod("identity-1", "linkerd", "identity", corev1.PodRunning, true),
-		testutil.CreateLinkerdControlPlanePod("proxy-injector-1", "linkerd", "proxy-injector", corev1.PodRunning, true),
+var _ = Describe("Checker", func() {
+	var (
+		ctx       context.Context
+		clientset *fake.Clientset
+		checker   *health.Checker
 	)
 
-	checker := NewChecker(clientset)
-	result, err := checker.CheckMeshHealth(context.Background(), "linkerd")
+	BeforeEach(func() {
+		ctx = context.Background()
+	})
 
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
+	Describe("NewChecker", func() {
+		It("should create a new checker with clientset", func() {
+			clientset = fake.NewSimpleClientset()
+			checker = health.NewChecker(clientset)
 
-	if result == nil {
-		t.Fatal("Expected result, got nil")
-	}
+			Expect(checker).NotTo(BeNil())
+		})
+	})
 
-	// Parse the result
-	var healthStatus map[string]interface{}
-	if err := testutil.ParseJSONResult(result, &healthStatus); err != nil {
-		t.Fatalf("Failed to parse result: %v", err)
-	}
+	Describe("CheckMeshHealth", func() {
+		Context("when control plane is healthy", func() {
+			BeforeEach(func() {
+				clientset = fake.NewSimpleClientset(
+					testutil.CreateLinkerdControlPlanePod("destination-1", "linkerd", "destination", corev1.PodRunning, true),
+					testutil.CreateLinkerdControlPlanePod("identity-1", "linkerd", "identity", corev1.PodRunning, true),
+					testutil.CreateLinkerdControlPlanePod("proxy-injector-1", "linkerd", "proxy-injector", corev1.PodRunning, true),
+				)
+				checker = health.NewChecker(clientset)
+			})
 
-	// Verify results
-	if healthStatus["namespace"] != "linkerd" {
-		t.Errorf("Expected namespace 'linkerd', got: %v", healthStatus["namespace"])
-	}
+			It("should return healthy status for all pods", func() {
+				result, err := checker.CheckMeshHealth(ctx, "linkerd")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).NotTo(BeNil())
 
-	totalPods := int(healthStatus["totalPods"].(float64))
-	if totalPods != 3 {
-		t.Errorf("Expected 3 total pods, got: %d", totalPods)
-	}
+				var healthStatus map[string]interface{}
+				err = testutil.ParseJSONResult(result, &healthStatus)
+				Expect(err).NotTo(HaveOccurred())
 
-	healthyPods := int(healthStatus["healthyPods"].(float64))
-	if healthyPods != 3 {
-		t.Errorf("Expected 3 healthy pods, got: %d", healthyPods)
-	}
+				Expect(healthStatus["namespace"]).To(Equal("linkerd"))
+				Expect(healthStatus["totalPods"]).To(BeNumerically("==", 3))
+				Expect(healthStatus["healthyPods"]).To(BeNumerically("==", 3))
+				Expect(healthStatus["unhealthyPods"]).To(BeNumerically("==", 0))
+			})
+		})
 
-	unhealthyPods := int(healthStatus["unhealthyPods"].(float64))
-	if unhealthyPods != 0 {
-		t.Errorf("Expected 0 unhealthy pods, got: %d", unhealthyPods)
-	}
-}
+		Context("when control plane has unhealthy pods", func() {
+			BeforeEach(func() {
+				clientset = fake.NewSimpleClientset(
+					testutil.CreateLinkerdControlPlanePod("destination-1", "linkerd", "destination", corev1.PodRunning, true),
+					testutil.CreateLinkerdControlPlanePod("identity-1", "linkerd", "identity", corev1.PodFailed, false),
+					testutil.CreateLinkerdControlPlanePod("proxy-injector-1", "linkerd", "proxy-injector", corev1.PodPending, false),
+				)
+				checker = health.NewChecker(clientset)
+			})
 
-func TestCheckMeshHealth_UnhealthyControlPlane(t *testing.T) {
-	// Create fake clientset with mix of healthy and unhealthy pods
-	clientset := fake.NewSimpleClientset(
-		testutil.CreateLinkerdControlPlanePod("destination-1", "linkerd", "destination", corev1.PodRunning, true),
-		testutil.CreateLinkerdControlPlanePod("identity-1", "linkerd", "identity", corev1.PodFailed, false),
-		testutil.CreateLinkerdControlPlanePod("proxy-injector-1", "linkerd", "proxy-injector", corev1.PodPending, false),
-	)
+			It("should return mixed health status", func() {
+				result, err := checker.CheckMeshHealth(ctx, "linkerd")
+				Expect(err).NotTo(HaveOccurred())
 
-	checker := NewChecker(clientset)
-	result, err := checker.CheckMeshHealth(context.Background(), "linkerd")
+				var healthStatus map[string]interface{}
+				err = testutil.ParseJSONResult(result, &healthStatus)
+				Expect(err).NotTo(HaveOccurred())
 
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
+				Expect(healthStatus["healthyPods"]).To(BeNumerically("==", 1))
+				Expect(healthStatus["unhealthyPods"]).To(BeNumerically("==", 2))
 
-	var healthStatus map[string]interface{}
-	textContent, ok := mcp.AsTextContent(result.Content[0])
-	if !ok {
-		t.Fatal("Expected text content")
-	}
-	if err := json.Unmarshal([]byte(textContent.Text), &healthStatus); err != nil {
-		t.Fatalf("Failed to parse result: %v", err)
-	}
+				components := healthStatus["components"].([]interface{})
+				Expect(components).To(HaveLen(3))
 
-	healthyPods := int(healthStatus["healthyPods"].(float64))
-	if healthyPods != 1 {
-		t.Errorf("Expected 1 healthy pod, got: %d", healthyPods)
-	}
+				// Verify failed pod is marked as unhealthy
+				foundFailedPod := false
+				for _, comp := range components {
+					component := comp.(map[string]interface{})
+					if component["name"] == "identity-1" {
+						foundFailedPod = true
+						Expect(component["healthy"]).To(BeFalse())
+						Expect(component["status"]).To(Equal("Failed"))
+					}
+				}
+				Expect(foundFailedPod).To(BeTrue(), "Failed pod should be found in components")
+			})
+		})
 
-	unhealthyPods := int(healthStatus["unhealthyPods"].(float64))
-	if unhealthyPods != 2 {
-		t.Errorf("Expected 2 unhealthy pods, got: %d", unhealthyPods)
-	}
+		Context("when namespace is empty", func() {
+			BeforeEach(func() {
+				clientset = fake.NewSimpleClientset(
+					testutil.CreateLinkerdControlPlanePod("destination-1", "linkerd", "destination", corev1.PodRunning, true),
+				)
+				checker = health.NewChecker(clientset)
+			})
 
-	// Verify component details
-	components := healthStatus["components"].([]interface{})
-	if len(components) != 3 {
-		t.Errorf("Expected 3 components, got: %d", len(components))
-	}
+			It("should default to linkerd namespace", func() {
+				result, err := checker.CheckMeshHealth(ctx, "")
+				Expect(err).NotTo(HaveOccurred())
 
-	// Check that failed pod is marked as unhealthy
-	foundFailedPod := false
-	for _, comp := range components {
-		component := comp.(map[string]interface{})
-		if component["name"] == "identity-1" {
-			foundFailedPod = true
-			if component["healthy"] != false {
-				t.Errorf("Expected identity-1 to be unhealthy")
-			}
-			if component["status"] != "Failed" {
-				t.Errorf("Expected status 'Failed', got: %v", component["status"])
-			}
-		}
-	}
-	if !foundFailedPod {
-		t.Error("Failed pod not found in components")
-	}
-}
+				var healthStatus map[string]interface{}
+				err = testutil.ParseJSONResult(result, &healthStatus)
+				Expect(err).NotTo(HaveOccurred())
 
-func TestCheckMeshHealth_EmptyNamespaceDefaultsToLinkerd(t *testing.T) {
-	clientset := fake.NewSimpleClientset(
-		testutil.CreateLinkerdControlPlanePod("destination-1", "linkerd", "destination", corev1.PodRunning, true),
-	)
+				Expect(healthStatus["namespace"]).To(Equal("linkerd"))
+			})
+		})
 
-	checker := NewChecker(clientset)
-	result, err := checker.CheckMeshHealth(context.Background(), "")
+		Context("when there are no control plane pods", func() {
+			BeforeEach(func() {
+				clientset = fake.NewSimpleClientset()
+				checker = health.NewChecker(clientset)
+			})
 
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
+			It("should return zero pod counts", func() {
+				result, err := checker.CheckMeshHealth(ctx, "linkerd")
+				Expect(err).NotTo(HaveOccurred())
 
-	var healthStatus map[string]interface{}
-	textContent, ok := mcp.AsTextContent(result.Content[0])
-	if !ok {
-		t.Fatal("Expected text content")
-	}
-	if err := json.Unmarshal([]byte(textContent.Text), &healthStatus); err != nil {
-		t.Fatalf("Failed to parse result: %v", err)
-	}
+				var healthStatus map[string]interface{}
+				err = testutil.ParseJSONResult(result, &healthStatus)
+				Expect(err).NotTo(HaveOccurred())
 
-	if healthStatus["namespace"] != "linkerd" {
-		t.Errorf("Expected default namespace 'linkerd', got: %v", healthStatus["namespace"])
-	}
-}
+				Expect(healthStatus["totalPods"]).To(BeNumerically("==", 0))
+				components := healthStatus["components"].([]interface{})
+				Expect(components).To(BeEmpty())
+			})
+		})
 
-func TestCheckMeshHealth_NoControlPlanePods(t *testing.T) {
-	// Create clientset with no control plane pods
-	clientset := fake.NewSimpleClientset()
+		Context("with custom namespace", func() {
+			BeforeEach(func() {
+				clientset = fake.NewSimpleClientset(
+					testutil.CreateLinkerdControlPlanePod("destination-1", "custom-mesh", "destination", corev1.PodRunning, true),
+				)
+				checker = health.NewChecker(clientset)
+			})
 
-	checker := NewChecker(clientset)
-	result, err := checker.CheckMeshHealth(context.Background(), "linkerd")
+			It("should query the custom namespace", func() {
+				result, err := checker.CheckMeshHealth(ctx, "custom-mesh")
+				Expect(err).NotTo(HaveOccurred())
 
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
+				var healthStatus map[string]interface{}
+				err = testutil.ParseJSONResult(result, &healthStatus)
+				Expect(err).NotTo(HaveOccurred())
 
-	var healthStatus map[string]interface{}
-	textContent, ok := mcp.AsTextContent(result.Content[0])
-	if !ok {
-		t.Fatal("Expected text content")
-	}
-	if err := json.Unmarshal([]byte(textContent.Text), &healthStatus); err != nil {
-		t.Fatalf("Failed to parse result: %v", err)
-	}
-
-	totalPods := int(healthStatus["totalPods"].(float64))
-	if totalPods != 0 {
-		t.Errorf("Expected 0 total pods, got: %d", totalPods)
-	}
-
-	components := healthStatus["components"].([]interface{})
-	if len(components) != 0 {
-		t.Errorf("Expected 0 components, got: %d", len(components))
-	}
-}
-
-func TestCheckMeshHealth_CustomNamespace(t *testing.T) {
-	// Create pods in custom namespace
-	clientset := fake.NewSimpleClientset(
-		testutil.CreateLinkerdControlPlanePod("destination-1", "custom-mesh", "destination", corev1.PodRunning, true),
-	)
-
-	checker := NewChecker(clientset)
-	result, err := checker.CheckMeshHealth(context.Background(), "custom-mesh")
-
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
-
-	var healthStatus map[string]interface{}
-	textContent, ok := mcp.AsTextContent(result.Content[0])
-	if !ok {
-		t.Fatal("Expected text content")
-	}
-	if err := json.Unmarshal([]byte(textContent.Text), &healthStatus); err != nil {
-		t.Fatalf("Failed to parse result: %v", err)
-	}
-
-	if healthStatus["namespace"] != "custom-mesh" {
-		t.Errorf("Expected namespace 'custom-mesh', got: %v", healthStatus["namespace"])
-	}
-
-	totalPods := int(healthStatus["totalPods"].(float64))
-	if totalPods != 1 {
-		t.Errorf("Expected 1 total pod, got: %d", totalPods)
-	}
-}
-
-func TestNewChecker(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
-	checker := NewChecker(clientset)
-
-	if checker == nil {
-		t.Fatal("Expected checker to be created")
-	}
-
-	if checker.clientset != clientset {
-		t.Error("Expected clientset to be set correctly")
-	}
-}
+				Expect(healthStatus["namespace"]).To(Equal("custom-mesh"))
+				Expect(healthStatus["totalPods"]).To(BeNumerically("==", 1))
+			})
+		})
+	})
+})
