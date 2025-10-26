@@ -131,11 +131,17 @@ Validates Linkerd service mesh configuration for correctness and best practices.
 
 **Arguments:**
 - `namespace` (optional): Namespace to validate (default: all namespaces)
-- `resource_type` (optional): Resource type to validate - `server`, `authpolicy`, `meshtls`, or `all` (default: `all`)
+- `resource_type` (optional): Resource type to validate - `server`, `authpolicy`, `meshtls`, `proxy`, `namespace`, or `all` (default: `all`)
 - `resource_name` (optional): Specific resource name to validate
 - `include_warnings` (optional): Include warnings in results (default: true)
 
 **Returns:** JSON validation report with errors, warnings, and informational messages
+
+**Supported Validations:**
+- **Server Resources**: Port configuration, pod selectors, proxy protocol, port conflicts
+- **AuthorizationPolicy Resources**: Target references, authentication references, policy consistency
+- **MeshTLSAuthentication Resources**: Identity format, service account references
+- **Proxy Configuration**: Injection annotations, CPU/memory resources, log levels, proxy versions (namespace and pod level)
 
 **Example Usage (via Claude Desktop or MCP Inspector):**
 
@@ -143,6 +149,8 @@ When using Claude Desktop, you can ask:
 - "Validate my Linkerd configuration"
 - "Check for any configuration errors in the prod namespace"
 - "Validate all Server resources and show me any issues"
+- "Check proxy configuration in the default namespace"
+- "Validate namespace annotations for proper Linkerd proxy injection"
 
 Or use the MCP Inspector for testing:
 ```bash
@@ -259,7 +267,7 @@ See [internal/README.md](internal/README.md) for detailed architecture documenta
 
 ## Testing
 
-The project includes comprehensive unit tests with 33+ test cases:
+The project includes comprehensive unit tests with 67+ test cases using Ginkgo/Gomega BDD framework:
 
 ```bash
 # Run all tests
@@ -292,8 +300,10 @@ See [.github/workflows/README.md](.github/workflows/README.md) for CI/CD documen
 - [x] Implement service mesh configuration validation
 - [ ] Add support for multi-cluster Linkerd setups
 - [ ] Provide detailed route and authorization policy insights
-- [ ] Add proxy configuration validation
+- [x] Add proxy configuration validation
 - [ ] Implement best practice recommendations
+- [ ] Add validation for HTTPRoute resources
+- [ ] Add validation for ServiceProfile resources
 
 ## License
 

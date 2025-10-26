@@ -12,9 +12,10 @@ import (
 
 // ConfigValidator orchestrates validation of Linkerd configuration
 type ConfigValidator struct {
-	serverValidator    *validators.ServerValidator
+	serverValidator     *validators.ServerValidator
 	authPolicyValidator *validators.AuthPolicyValidator
-	meshTLSValidator   *validators.MeshTLSValidator
+	meshTLSValidator    *validators.MeshTLSValidator
+	proxyValidator      *validators.ProxyValidator
 }
 
 // NewConfigValidator creates a new configuration validator
@@ -23,6 +24,7 @@ func NewConfigValidator(clientset kubernetes.Interface, dynamicClient dynamic.In
 		serverValidator:     validators.NewServerValidator(clientset, dynamicClient),
 		authPolicyValidator: validators.NewAuthPolicyValidator(dynamicClient),
 		meshTLSValidator:    validators.NewMeshTLSValidator(clientset, dynamicClient),
+		proxyValidator:      validators.NewProxyValidator(clientset),
 	}
 }
 
@@ -44,6 +46,16 @@ func (cv *ConfigValidator) ValidateConfig(ctx context.Context, namespace, resour
 	case "meshtls", "meshtlsauthentication":
 		results := cv.meshTLSValidator.ValidateAll(ctx, namespace)
 		cv.addResultsToReport(&report, results, resourceName, includeWarnings)
+	case "proxy", "namespace":
+		// Validate proxy configuration on namespaces
+		if namespace == "" {
+			results := cv.proxyValidator.ValidateAllNamespaces(ctx)
+			cv.addResultsToReport(&report, results, resourceName, includeWarnings)
+		} else {
+			// Validate specific namespace and its pods
+			results := cv.proxyValidator.ValidateAllPodsInNamespace(ctx, namespace)
+			cv.addResultsToReport(&report, results, resourceName, includeWarnings)
+		}
 	case "all", "":
 		// Validate all resource types
 		serverResults := cv.serverValidator.ValidateAll(ctx, namespace)
@@ -54,8 +66,17 @@ func (cv *ConfigValidator) ValidateConfig(ctx context.Context, namespace, resour
 
 		meshTLSResults := cv.meshTLSValidator.ValidateAll(ctx, namespace)
 		cv.addResultsToReport(&report, meshTLSResults, resourceName, includeWarnings)
+
+		// Validate proxy configuration
+		if namespace == "" {
+			proxyResults := cv.proxyValidator.ValidateAllNamespaces(ctx)
+			cv.addResultsToReport(&report, proxyResults, resourceName, includeWarnings)
+		} else {
+			proxyResults := cv.proxyValidator.ValidateAllPodsInNamespace(ctx, namespace)
+			cv.addResultsToReport(&report, proxyResults, resourceName, includeWarnings)
+		}
 	default:
-		return mcp.NewToolResultError("Invalid resource_type. Must be one of: server, authpolicy, meshtls, all"), nil
+		return mcp.NewToolResultError("Invalid resource_type. Must be one of: server, authpolicy, meshtls, proxy, all"), nil
 	}
 
 	report.Finalize()

@@ -273,7 +273,8 @@ internal/
         ├── types.go              # Validation result types
         ├── server.go             # Server CRD validator
         ├── authpolicy.go         # AuthorizationPolicy validator
-        └── meshtls.go            # MeshTLSAuthentication validator
+        ├── meshtls.go            # MeshTLSAuthentication validator
+        └── proxy.go              # Proxy configuration validator
 ```
 
 ### Validation Rules
@@ -299,6 +300,17 @@ The validators check for:
 - ServiceAccount references are correct
 - Warnings for wildcard (`*`) usage
 
+**Proxy Configuration Validation (LNKD-P001 to LNKD-P016):**
+- Valid injection annotation values (enabled/disabled/ingress)
+- CPU request/limit format and consistency
+- Memory request/limit format and consistency
+- Log level validation (trace/debug/info/warn/error)
+- Proxy version format validation
+- Wait-before-exit-seconds range validation
+- Warnings for missing proxy containers with injection enabled
+- Warnings for debug/trace log levels in production
+- Resource limit < request detection
+
 ### Using the Validation Tool
 
 **Via Claude Desktop (Natural Language):**
@@ -309,6 +321,8 @@ Ask Claude to validate your configuration:
 - "Check for errors in the prod namespace Linkerd setup"
 - "Validate all Server resources and show me any warnings"
 - "Are there any issues with my Linkerd authorization policies?"
+- "Check proxy configuration in the default namespace"
+- "Validate namespace annotations for proper proxy injection"
 
 **Via MCP Inspector (Direct Tool Calls):**
 
@@ -322,6 +336,8 @@ Then use the tool with these argument patterns:
 - Validate namespace: `{"namespace": "prod"}`
 - Validate type: `{"resource_type": "server"}`
 - Validate specific: `{"namespace": "prod", "resource_type": "server", "resource_name": "backend-server"}`
+- Validate proxy config: `{"resource_type": "proxy", "namespace": "default"}`
+- Validate namespace annotations: `{"resource_type": "namespace"}`
 - Errors only: `{"include_warnings": false}`
 
 ### Example Validation Output
