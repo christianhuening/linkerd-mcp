@@ -7,15 +7,17 @@ import (
 	"github.com/christianhuening/linkerd-mcp/internal/health"
 	"github.com/christianhuening/linkerd-mcp/internal/mesh"
 	"github.com/christianhuening/linkerd-mcp/internal/policy"
+	"github.com/christianhuening/linkerd-mcp/internal/validation"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // LinkerdMCPServer represents the MCP server for Linkerd
 type LinkerdMCPServer struct {
-	healthChecker   *health.Checker
-	serviceLister   *mesh.ServiceLister
-	policyAnalyzer  *policy.Analyzer
+	healthChecker    *health.Checker
+	serviceLister    *mesh.ServiceLister
+	policyAnalyzer   *policy.Analyzer
+	configValidator  *validation.ConfigValidator
 }
 
 // New creates a new LinkerdMCPServer
@@ -26,9 +28,10 @@ func New() (*LinkerdMCPServer, error) {
 	}
 
 	return &LinkerdMCPServer{
-		healthChecker:  health.NewChecker(clients.Clientset),
-		serviceLister:  mesh.NewServiceLister(clients.Clientset),
-		policyAnalyzer: policy.NewAnalyzer(clients.Clientset, clients.DynamicClient),
+		healthChecker:   health.NewChecker(clients.Clientset),
+		serviceLister:   mesh.NewServiceLister(clients.Clientset),
+		policyAnalyzer:  policy.NewAnalyzer(clients.Clientset, clients.DynamicClient),
+		configValidator: validation.NewConfigValidator(clients.Clientset, clients.DynamicClient),
 	}, nil
 }
 
@@ -124,5 +127,33 @@ func (s *LinkerdMCPServer) RegisterTools(mcpServer *server.MCPServer) {
 		targetNamespace, _ := args["target_namespace"].(string)
 		targetService, _ := args["target_service"].(string)
 		return s.policyAnalyzer.GetAllowedSources(ctx, targetNamespace, targetService)
+	})
+
+	// Register tool: Validate mesh configuration
+	validateMeshConfigTool := mcp.NewTool("validate_mesh_config",
+		mcp.WithDescription("Validate Linkerd service mesh configuration"),
+		mcp.WithString("namespace",
+			mcp.Description("Namespace to validate (empty for all namespaces)"),
+		),
+		mcp.WithString("resource_type",
+			mcp.Description("Resource type to validate (server|authpolicy|meshtls|all)"),
+		),
+		mcp.WithString("resource_name",
+			mcp.Description("Specific resource name to validate"),
+		),
+		mcp.WithBoolean("include_warnings",
+			mcp.Description("Include warnings in results (default: true)"),
+		),
+	)
+	mcpServer.AddTool(validateMeshConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args, _ := request.Params.Arguments.(map[string]interface{})
+		namespace, _ := args["namespace"].(string)
+		resourceType, _ := args["resource_type"].(string)
+		resourceName, _ := args["resource_name"].(string)
+		includeWarnings := true
+		if v, ok := args["include_warnings"].(bool); ok {
+			includeWarnings = v
+		}
+		return s.configValidator.ValidateConfig(ctx, namespace, resourceType, resourceName, includeWarnings)
 	})
 }

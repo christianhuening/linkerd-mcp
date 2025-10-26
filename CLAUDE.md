@@ -258,3 +258,170 @@ for _, item := range list.Items {
 ## Go Version
 
 Project uses **Go 1.25** (see go.mod). CI tests against Go 1.25 and 1.25 for compatibility.
+
+## Configuration Validation
+
+The validation package (`internal/validation/`) provides comprehensive validation of Linkerd configuration resources.
+
+### Architecture
+
+```
+internal/
+└── validation/
+    ├── validator.go               # Main orchestrator
+    └── validators/
+        ├── types.go              # Validation result types
+        ├── server.go             # Server CRD validator
+        ├── authpolicy.go         # AuthorizationPolicy validator
+        └── meshtls.go            # MeshTLSAuthentication validator
+```
+
+### Validation Rules
+
+The validators check for:
+
+**Server Validation (LNKD-001 to LNKD-008):**
+- Valid podSelector configuration
+- Port in range (1-65535)
+- Valid proxyProtocol values
+- No conflicting server definitions
+- Pods exist matching the selector
+
+**AuthorizationPolicy Validation (LNKD-009 to LNKD-019):**
+- Valid targetRef to existing Server
+- Authentication references exist
+- Correct authentication kinds (MeshTLS/Network)
+- No orphaned policies
+
+**MeshTLSAuthentication Validation (LNKD-020 to LNKD-027):**
+- At least one identity or serviceAccount specified
+- Valid identity format
+- ServiceAccount references are correct
+- Warnings for wildcard (`*`) usage
+
+### Using the Validation Tool
+
+```bash
+# Validate all resources
+mcp-client call validate_mesh_config '{}'
+
+# Validate specific namespace
+mcp-client call validate_mesh_config '{"namespace": "prod"}'
+
+# Validate only servers
+mcp-client call validate_mesh_config '{"resource_type": "server"}'
+
+# Validate specific resource
+mcp-client call validate_mesh_config '{
+  "namespace": "prod",
+  "resource_type": "server",
+  "resource_name": "backend-server"
+}'
+
+# Errors only (no warnings)
+mcp-client call validate_mesh_config '{"include_warnings": false}'
+```
+
+### Example Validation Output
+
+```json
+{
+  "totalResources": 15,
+  "validResources": 12,
+  "summary": {
+    "errors": 2,
+    "warnings": 5,
+    "info": 3
+  },
+  "results": [
+    {
+      "resourceType": "Server",
+      "name": "backend-server",
+      "namespace": "prod",
+      "valid": false,
+      "timestamp": "2025-01-26T10:30:00Z",
+      "issues": [
+        {
+          "severity": "error",
+          "message": "Invalid port 70000, must be between 1-65535",
+          "field": "spec.port",
+          "code": "LNKD-006",
+          "remediation": "Set port to a valid value between 1-65535"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Adding New Validators
+
+To add a new validator:
+
+1. Create validator file in `internal/validation/validators/`:
+   ```go
+   type MyValidator struct {
+       clientset     kubernetes.Interface
+       dynamicClient dynamic.Interface
+   }
+
+   func NewMyValidator(clientset kubernetes.Interface, dynamicClient dynamic.Interface) *MyValidator {
+       return &MyValidator{clientset: clientset, dynamicClient: dynamicClient}
+   }
+
+   func (v *MyValidator) Validate(ctx context.Context, resource *unstructured.Unstructured) ValidationResult {
+       result := ValidationResult{
+           ResourceType: "MyResource",
+           Name:         resource.GetName(),
+           Namespace:    resource.GetNamespace(),
+           Issues:       []Issue{},
+       }
+
+       // Add validation logic
+       result.AddIssue(SeverityError, "message", "field", "code", "remediation")
+
+       result.Finalize()
+       return result
+   }
+
+   func (v *MyValidator) ValidateAll(ctx context.Context, namespace string) []ValidationResult {
+       // Implementation
+   }
+   ```
+
+2. Add to `ConfigValidator` in `validator.go`
+3. Write Ginkgo tests in `validators/*_test.go`
+4. Update documentation
+
+### Testing Validators
+
+Tests use Ginkgo/Gomega and fake Kubernetes clients:
+
+```go
+var _ = Describe("MyValidator", func() {
+    var (
+        ctx           context.Context
+        validator     *validators.MyValidator
+        kubeClient    *kubefake.Clientset
+        dynamicClient *fake.FakeDynamicClient
+    )
+
+    BeforeEach(func() {
+        ctx = context.Background()
+        // Setup fake clients
+        validator = validators.NewMyValidator(kubeClient, dynamicClient)
+    })
+
+    Describe("Validate", func() {
+        Context("with valid configuration", func() {
+            It("should pass validation", func() {
+                resource := createTestResource()
+                result := validator.Validate(ctx, resource)
+                
+                Expect(result.Valid).To(BeTrue())
+                Expect(result.Issues).To(BeEmpty())
+            })
+        })
+    })
+})
+```

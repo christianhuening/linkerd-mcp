@@ -16,6 +16,7 @@ DISCLAIMER: This project has been created with Claude.AI!
 - **Connectivity Analysis**: Analyze Linkerd policies to determine allowed connectivity between services
 - **Service Discovery**: List all services that are part of the Linkerd mesh
 - **Authorization Policy Analysis**: Query which services can access a target or what targets a source can reach
+- **Configuration Validation**: Validate Linkerd resources (Servers, AuthorizationPolicies, MeshTLS) for correctness and best practices
 - **Production Ready**: Modern security features, Helm charts, comprehensive tests, and CI/CD
 
 ## Quick Start
@@ -88,6 +89,29 @@ Find all services that can communicate with a given target service based on Link
 - `target_service` (required): Name of the target service
 
 **Returns:** JSON list of all sources authorized to access the target
+
+### 6. `validate_mesh_config`
+Validates Linkerd service mesh configuration for correctness and best practices.
+
+**Arguments:**
+- `namespace` (optional): Namespace to validate (default: all namespaces)
+- `resource_type` (optional): Resource type to validate - `server`, `authpolicy`, `meshtls`, or `all` (default: `all`)
+- `resource_name` (optional): Specific resource name to validate
+- `include_warnings` (optional): Include warnings in results (default: true)
+
+**Returns:** JSON validation report with errors, warnings, and informational messages
+
+**Example:**
+```bash
+# Validate all resources
+mcp-client call validate_mesh_config '{}'
+
+# Validate only servers in prod namespace
+mcp-client call validate_mesh_config '{"namespace": "prod", "resource_type": "server"}'
+
+# Validate specific resource
+mcp-client call validate_mesh_config '{"namespace": "prod", "resource_type": "server", "resource_name": "backend-server"}'
+```
 
 ## Prerequisites
 
@@ -228,9 +252,11 @@ See [.github/workflows/README.md](.github/workflows/README.md) for CI/CD documen
 
 - [ ] Complete Linkerd policy CRD integration for detailed connectivity analysis
 - [ ] Add support for analyzing traffic metrics
-- [ ] Implement service mesh configuration validation
+- [x] Implement service mesh configuration validation
 - [ ] Add support for multi-cluster Linkerd setups
 - [ ] Provide detailed route and authorization policy insights
+- [ ] Add proxy configuration validation
+- [ ] Implement best practice recommendations
 
 ## License
 
