@@ -21,6 +21,39 @@ DISCLAIMER: This project has been created with Claude.AI!
 
 ## Quick Start
 
+### Using with Claude Desktop (Recommended)
+
+1. **Install the server:**
+   ```bash
+   # From source
+   git clone https://github.com/christianhuening/linkerd-mcp.git
+   cd linkerd-mcp
+   go build -o linkerd-mcp
+
+   # Or download pre-built binary from releases
+   ```
+
+2. **Configure Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+   ```json
+   {
+     "mcpServers": {
+       "linkerd": {
+         "command": "/path/to/linkerd-mcp",
+         "args": [],
+         "env": {
+           "KUBECONFIG": "/Users/yourname/.kube/config"
+         }
+       }
+     }
+   }
+   ```
+
+3. **Use in Claude Desktop:**
+   - "Check the health of my Linkerd mesh"
+   - "List all services in the mesh"
+   - "Validate my Linkerd configuration in the prod namespace"
+   - "What services can the frontend service communicate with?"
+
 ### Using Docker
 
 ```bash
@@ -28,20 +61,23 @@ docker pull ghcr.io/christianhuening/linkerd-mcp:latest
 docker run --rm -v ~/.kube/config:/root/.kube/config ghcr.io/christianhuening/linkerd-mcp:latest
 ```
 
-### Using Helm
+### Using Helm (In-Cluster Deployment)
 
 ```bash
 helm install linkerd-mcp ./helm/linkerd-mcp -n linkerd --create-namespace
 ```
 
-### From Source
+### Testing with MCP Inspector
 
 ```bash
-git clone https://github.com/christianhuening/linkerd-mcp.git
-cd linkerd-mcp
+# Build from source
 go build -o linkerd-mcp
-./linkerd-mcp
+
+# Run inspector
+npx @modelcontextprotocol/inspector ./linkerd-mcp
 ```
+
+This opens a web interface where you can test all MCP tools interactively.
 
 ## MCP Tools
 
@@ -101,16 +137,17 @@ Validates Linkerd service mesh configuration for correctness and best practices.
 
 **Returns:** JSON validation report with errors, warnings, and informational messages
 
-**Example:**
+**Example Usage (via Claude Desktop or MCP Inspector):**
+
+When using Claude Desktop, you can ask:
+- "Validate my Linkerd configuration"
+- "Check for any configuration errors in the prod namespace"
+- "Validate all Server resources and show me any issues"
+
+Or use the MCP Inspector for testing:
 ```bash
-# Validate all resources
-mcp-client call validate_mesh_config '{}'
-
-# Validate only servers in prod namespace
-mcp-client call validate_mesh_config '{"namespace": "prod", "resource_type": "server"}'
-
-# Validate specific resource
-mcp-client call validate_mesh_config '{"namespace": "prod", "resource_type": "server", "resource_name": "backend-server"}'
+npx @modelcontextprotocol/inspector ./linkerd-mcp
+# Then call: validate_mesh_config with arguments: {}
 ```
 
 ## Prerequisites

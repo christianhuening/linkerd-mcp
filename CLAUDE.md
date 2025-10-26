@@ -301,26 +301,28 @@ The validators check for:
 
 ### Using the Validation Tool
 
+**Via Claude Desktop (Natural Language):**
+
+Ask Claude to validate your configuration:
+
+- "Validate my Linkerd configuration"
+- "Check for errors in the prod namespace Linkerd setup"
+- "Validate all Server resources and show me any warnings"
+- "Are there any issues with my Linkerd authorization policies?"
+
+**Via MCP Inspector (Direct Tool Calls):**
+
 ```bash
-# Validate all resources
-mcp-client call validate_mesh_config '{}'
-
-# Validate specific namespace
-mcp-client call validate_mesh_config '{"namespace": "prod"}'
-
-# Validate only servers
-mcp-client call validate_mesh_config '{"resource_type": "server"}'
-
-# Validate specific resource
-mcp-client call validate_mesh_config '{
-  "namespace": "prod",
-  "resource_type": "server",
-  "resource_name": "backend-server"
-}'
-
-# Errors only (no warnings)
-mcp-client call validate_mesh_config '{"include_warnings": false}'
+npx @modelcontextprotocol/inspector ./linkerd-mcp
 ```
+
+Then use the tool with these argument patterns:
+
+- Validate all: `{}`
+- Validate namespace: `{"namespace": "prod"}`
+- Validate type: `{"resource_type": "server"}`
+- Validate specific: `{"namespace": "prod", "resource_type": "server", "resource_name": "backend-server"}`
+- Errors only: `{"include_warnings": false}`
 
 ### Example Validation Output
 
