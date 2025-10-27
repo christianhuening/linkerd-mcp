@@ -97,10 +97,10 @@ func (c *MetricsCollector) GetServiceMetrics(ctx context.Context, namespace, ser
 	errorsByStatus := c.extractErrorsByStatus(errorsByStatusResult)
 
 	metrics := ServiceMetrics{
-		Service:    service,
-		Namespace:  namespace,
-		Deployment: deployment,
-		TimeRange:  tr,
+		Service:     service,
+		Namespace:   namespace,
+		Deployment:  deployment,
+		TimeRange:   tr,
 		RequestRate: requestRate,
 		SuccessRate: successRate * 100, // Convert to percentage
 		ErrorRate:   errorRate * 100,   // Convert to percentage
