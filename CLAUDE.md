@@ -84,12 +84,18 @@ linkerd-mcp/
     ├── config/                # Kubernetes client initialization (in-cluster + kubeconfig)
     ├── health/                # Linkerd control plane health checking
     ├── mesh/                  # Service mesh discovery (finds meshed services/pods)
+    ├── metrics/               # Traffic metrics collection and analysis (NEW)
+    │   ├── types.go           # Metric types and data structures
+    │   ├── prometheus.go      # Prometheus client wrapper
+    │   ├── queries.go         # PromQL query builder
+    │   └── collector.go       # Metrics collection and aggregation
     ├── policy/                # Authorization policy analysis (4 files)
     │   ├── analyzer.go        # Public API and AnalyzeConnectivity
     │   ├── targets.go         # GetAllowedTargets - what can source reach
     │   ├── sources.go         # GetAllowedSources - who can reach target
     │   └── auth.go            # Authentication matching (MeshTLS, Network, ServiceAccount)
     ├── server/                # MCP server setup and tool registration
+    ├── validation/            # Configuration validation framework
     └── testutil/              # Test helpers (fixtures, MCP result parsing)
 ```
 
@@ -97,8 +103,8 @@ linkerd-mcp/
 
 1. **main.go** initializes `LinkerdMCPServer` via `server.New()`
 2. **server.New()** creates Kubernetes clients via `config.NewKubernetesClients()`
-3. Clients are injected into domain components (health, mesh, policy)
-4. **RegisterTools()** registers 5 MCP tools with handlers
+3. Clients are injected into domain components (health, mesh, policy, metrics, validation)
+4. **RegisterTools()** registers 10 MCP tools with handlers
 5. Server runs using stdio transport (`mcpserver.ServeStdio`)
 
 ### Key Dependencies
@@ -106,6 +112,7 @@ linkerd-mcp/
 - **mcp-go**: MCP protocol implementation - `github.com/mark3labs/mcp-go`
 - **client-go**: Standard Kubernetes API client (Pods, Services, etc.)
 - **dynamic client**: For querying Linkerd CRDs (Server, AuthorizationPolicy, MeshTLSAuthentication, etc.)
+- **prometheus/client_golang**: Prometheus API client for metrics collection
 
 ### MCP Tools Provided
 
@@ -114,6 +121,11 @@ linkerd-mcp/
 3. `list_meshed_services` - Discover all services with linkerd-proxy injected
 4. `get_allowed_targets` - Find all targets a source service can access
 5. `get_allowed_sources` - Find all sources that can access a target service
+6. `validate_mesh_config` - Validate Linkerd configuration resources
+7. `get_service_metrics` - Get traffic metrics for a service
+8. `analyze_traffic_flow` - Analyze traffic metrics between services
+9. `get_service_health_summary` - Get health summary based on metrics
+10. `get_top_services` - Get services ranked by traffic metrics
 
 ## Linkerd Policy Analysis
 
@@ -167,10 +179,128 @@ GitHub Actions workflows (`.github/workflows/`):
 - **docker.yml**: Builds and pushes multi-arch Docker images to GHCR
 - **release.yml**: Creates GitHub releases with binaries for all platforms
 
+## Traffic Metrics Analysis
+
+The metrics package (`internal/metrics/`) collects and analyzes traffic metrics from Linkerd's Prometheus instance.
+
+### Architecture
+
+```
+internal/
+└── metrics/
+    ├── types.go          # Metric types (ServiceMetrics, TrafficMetrics, HealthStatus)
+    ├── prometheus.go     # Prometheus API client wrapper
+    ├── queries.go        # PromQL query builder for Linkerd metrics
+    └── collector.go      # MetricsCollector - aggregates and analyzes metrics
+```
+
+### Key Metrics Collected
+
+**Service Metrics:**
+- Request rate (requests/second)
+- Success rate (percentage of non-5xx responses)
+- Error rate (percentage of 5xx responses)
+- Latency percentiles (p50, p95, p99, mean)
+- Errors by HTTP status code
+
+**Traffic Flow Metrics:**
+- Request count and rate between services
+- Success/error rates for service-to-service communication
+- Latency percentiles for traffic between services
+- Bytes sent and received (optional)
+
+**Health Assessment:**
+- Automated health status (healthy/degraded/unhealthy)
+- Configurable thresholds for error rates and latency
+- Issue detection with severity levels
+
+### PromQL Queries
+
+The query builder generates optimized PromQL queries for Linkerd metrics:
+
+```go
+// Request rate
+sum(rate(request_total{deployment="frontend", namespace="default", direction="inbound"}[5m]))
+
+// Success rate
+sum(rate(response_total{..., classification!="failure"}[5m])) / sum(rate(response_total{...}[5m]))
+
+// P95 latency
+histogram_quantile(0.95, sum(rate(response_latency_ms_bucket{...}[5m])) by (le))
+
+// Traffic between services
+sum(rate(request_total{deployment="frontend", dst_deployment="backend", direction="outbound"}[5m]))
+```
+
+### Usage
+
+**Via Claude Desktop:**
+- "Show me the request rate for the frontend service"
+- "What's the p95 latency for api-gateway over the last hour?"
+- "Analyze traffic between frontend and backend"
+- "Which services have the highest error rates?"
+- "Show me a health summary of all services in prod"
+
+**Via MCP Inspector:**
+```bash
+npx @modelcontextprotocol/inspector ./linkerd-mcp
+# Test tools: get_service_metrics, analyze_traffic_flow, etc.
+```
+
+**Example Code:**
+```go
+// Create metrics collector
+collector, err := metrics.NewMetricsCollector(config, clientset, "linkerd")
+
+// Get service metrics
+result, err := collector.GetServiceMetrics(ctx, "default", "frontend", "5m")
+
+// Analyze traffic flow
+result, err := collector.AnalyzeTrafficFlow(ctx, "default", "frontend", "default", "backend", "1h")
+
+// Get health summary
+result, err := collector.GetServiceHealthSummary(ctx, "prod", "5m", metrics.DefaultHealthThresholds())
+```
+
+### Configuration
+
+**Prometheus Connection:**
+- Default: `http://prometheus.linkerd.svc.cluster.local:9090`
+- Override: Set `LINKERD_PROMETHEUS_URL` environment variable
+- Graceful degradation: If Prometheus is unavailable, metrics tools are disabled
+
+**Time Ranges:**
+- Supported formats: "5m", "10m", "1h", "24h", etc.
+- Automatic step calculation based on duration
+- Default: 5 minutes
+
+**Health Thresholds:**
+```go
+thresholds := metrics.DefaultHealthThresholds()
+// ErrorRateWarning: 5%
+// ErrorRateCritical: 10%
+// LatencyP95Warning: 1000ms
+// LatencyP95Critical: 5000ms
+// SuccessRateWarning: 95%
+// SuccessRateCritical: 90%
+```
+
+### Testing
+
+Metrics tests use Ginkgo/Gomega:
+- 26 test specs covering types, queries, and collectors
+- Mock Prometheus API responses (future enhancement)
+- Integration tests require real Prometheus instance (skipped by default)
+
+```bash
+go test ./internal/metrics -v
+```
+
 ## Environment Variables
 
 - `KUBECONFIG`: Path to kubeconfig file (for local development)
 - `LINKERD_NAMESPACE`: Override Linkerd control plane namespace (default: "linkerd")
+- `LINKERD_PROMETHEUS_URL`: Override Prometheus URL (default: "http://prometheus.linkerd.svc.cluster.local:9090")
 
 ## RBAC Requirements
 

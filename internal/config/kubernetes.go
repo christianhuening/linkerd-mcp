@@ -12,6 +12,7 @@ import (
 
 // KubernetesClients holds the Kubernetes clients
 type KubernetesClients struct {
+	Config        *rest.Config
 	Clientset     *kubernetes.Clientset
 	DynamicClient dynamic.Interface
 }
@@ -34,6 +35,7 @@ func NewKubernetesClients() (*KubernetesClients, error) {
 	}
 
 	return &KubernetesClients{
+		Config:        config,
 		Clientset:     clientset,
 		DynamicClient: dynamicClient,
 	}, nil

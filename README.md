@@ -17,6 +17,7 @@ DISCLAIMER: This project has been created with Claude.AI!
 - **Service Discovery**: List all services that are part of the Linkerd mesh
 - **Authorization Policy Analysis**: Query which services can access a target or what targets a source can reach
 - **Configuration Validation**: Validate Linkerd resources (Servers, AuthorizationPolicies, MeshTLS) for correctness and best practices
+- **Traffic Metrics Analysis**: Query real-time traffic metrics including request rates, latency percentiles, success rates, and error rates
 - **Production Ready**: Modern security features, Helm charts, comprehensive tests, and CI/CD
 
 ## Quick Start
@@ -158,6 +159,57 @@ npx @modelcontextprotocol/inspector ./linkerd-mcp
 # Then call: validate_mesh_config with arguments: {}
 ```
 
+### 7. `get_service_metrics`
+Get traffic metrics for a service from Prometheus.
+
+**Arguments:**
+- `namespace` (required): Service namespace
+- `service` (required): Service name
+- `time_range` (optional): Time range (e.g., "5m", "1h", "24h"). Default: 5m
+
+**Returns:** JSON with request rate, success rate, error rate, and latency percentiles (p50, p95, p99)
+
+### 8. `analyze_traffic_flow`
+Analyze traffic metrics between two services.
+
+**Arguments:**
+- `source_namespace` (required): Source service namespace
+- `source_service` (required): Source service name
+- `target_namespace` (optional): Target service namespace (defaults to source)
+- `target_service` (required): Target service name
+- `time_range` (optional): Time range (e.g., "5m", "1h", "24h"). Default: 5m
+
+**Returns:** JSON with traffic metrics including request rates, latency, and error rates between the services
+
+### 9. `get_service_health_summary`
+Get health summary for all services in a namespace based on metrics.
+
+**Arguments:**
+- `namespace` (required): Namespace to check
+- `time_range` (optional): Time range (e.g., "5m", "1h", "24h"). Default: 5m
+
+**Returns:** JSON with health status for each service, highlighting services with high error rates or latency
+
+### 10. `get_top_services`
+Get services ranked by traffic metrics.
+
+**Arguments:**
+- `namespace` (required): Namespace to query
+- `sort_by` (optional): Metric to sort by: "request_rate", "error_rate", "latency_p95". Default: request_rate
+- `time_range` (optional): Time range (e.g., "5m", "1h", "24h"). Default: 5m
+- `limit` (optional): Number of top services to return. Default: 10
+
+**Returns:** JSON with ranked list of services and their metrics
+
+**Example Usage (via Claude Desktop):**
+- "Show me the request rate for the frontend service in the default namespace"
+- "What's the p95 latency for api-gateway over the last hour?"
+- "Analyze traffic between frontend and backend services"
+- "Which services have the highest error rates in prod?"
+- "Show me a health summary of all services in the default namespace"
+
+**Note:** Metrics tools require Prometheus to be accessible. Set `LINKERD_PROMETHEUS_URL` environment variable to override the default `http://prometheus.linkerd.svc.cluster.local:9090`.
+
 ## Prerequisites
 
 - Go 1.23 or later
@@ -267,7 +319,7 @@ See [internal/README.md](internal/README.md) for detailed architecture documenta
 
 ## Testing
 
-The project includes comprehensive unit tests with 67+ test cases using Ginkgo/Gomega BDD framework:
+The project includes comprehensive unit tests with 93+ test cases using Ginkgo/Gomega BDD framework:
 
 ```bash
 # Run all tests
@@ -296,7 +348,7 @@ See [.github/workflows/README.md](.github/workflows/README.md) for CI/CD documen
 ## Future Enhancements
 
 - [ ] Complete Linkerd policy CRD integration for detailed connectivity analysis
-- [ ] Add support for analyzing traffic metrics
+- [x] Add support for analyzing traffic metrics
 - [x] Implement service mesh configuration validation
 - [ ] Add support for multi-cluster Linkerd setups
 - [ ] Provide detailed route and authorization policy insights
@@ -304,6 +356,8 @@ See [.github/workflows/README.md](.github/workflows/README.md) for CI/CD documen
 - [ ] Implement best practice recommendations
 - [ ] Add validation for HTTPRoute resources
 - [ ] Add validation for ServiceProfile resources
+- [ ] Add real-time traffic streaming via Linkerd Tap API
+- [ ] Add historical trend analysis and anomaly detection
 
 ## License
 
