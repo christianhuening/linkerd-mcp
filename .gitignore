@@ -18,7 +18,7 @@ go.work
 vendor/
 
 # Build output
-./linkerd-mcp
+linkerd-mcp
 
 # IDE
 .vscode/
