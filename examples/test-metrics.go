@@ -11,6 +11,7 @@ import (
 
 	"github.com/christianhuening/linkerd-mcp/internal/config"
 	"github.com/christianhuening/linkerd-mcp/internal/metrics"
+	"github.com/mark3labs/mcp-go/mcp"
 )
 
 func main() {
@@ -60,10 +61,15 @@ func main() {
 		log.Fatalf("Failed to get service metrics: %v", err)
 	}
 
+	textContent, ok := mcp.AsTextContent(result.Content[0])
+	if !ok || textContent == nil {
+		log.Fatal("Failed to parse content as text")
+	}
+
 	// Parse and display the result
 	var serviceMetrics metrics.ServiceMetrics
-	if len(result.Content) > 0 && result.Content[0].Text != nil {
-		if err := json.Unmarshal([]byte(*result.Content[0].Text), &serviceMetrics); err != nil {
+	if len(result.Content) > 0 && textContent.Text != "" {
+		if err := json.Unmarshal([]byte(textContent.Text), &serviceMetrics); err != nil {
 			log.Fatalf("Failed to parse service metrics: %v", err)
 		}
 
@@ -84,8 +90,8 @@ func main() {
 				fmt.Printf("    %s: %d\n", status, count)
 			}
 		}
-	} else if result.IsError != nil && *result.IsError {
-		fmt.Printf("Error: %s\n", *result.Content[0].Text)
+	} else if result.IsError {
+		fmt.Printf("Error: %s\n", textContent.Text)
 	}
 
 	// Test 2: Get service health summary
@@ -97,9 +103,14 @@ func main() {
 		log.Fatalf("Failed to get service health summary: %v", err)
 	}
 
-	if len(healthResult.Content) > 0 && healthResult.Content[0].Text != nil {
+	textContentHealth, ok := mcp.AsTextContent(healthResult.Content[0])
+	if !ok || textContentHealth == nil {
+		log.Fatal("Failed to parse content as text")
+	}
+
+	if len(healthResult.Content) > 0 && textContent.Text != "" {
 		var healthSummary map[string]interface{}
-		if err := json.Unmarshal([]byte(*healthResult.Content[0].Text), &healthSummary); err != nil {
+		if err := json.Unmarshal([]byte(textContent.Text), &healthSummary); err != nil {
 			log.Fatalf("Failed to parse health summary: %v", err)
 		}
 
@@ -119,9 +130,14 @@ func main() {
 		log.Fatalf("Failed to get top services: %v", err)
 	}
 
-	if len(topResult.Content) > 0 && topResult.Content[0].Text != nil {
+	textContentTop, ok := mcp.AsTextContent(topResult.Content[0])
+	if !ok || textContentTop == nil {
+		log.Fatal("Failed to parse content as text")
+	}
+
+	if len(topResult.Content) > 0 && textContentTop.Text != "" {
 		var topServices metrics.ServiceRanking
-		if err := json.Unmarshal([]byte(*topResult.Content[0].Text), &topServices); err != nil {
+		if err := json.Unmarshal([]byte(textContentTop.Text), &topServices); err != nil {
 			log.Fatalf("Failed to parse top services: %v", err)
 		}
 
