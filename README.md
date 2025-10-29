@@ -358,6 +358,9 @@ See [.github/workflows/README.md](.github/workflows/README.md) for CI/CD documen
 - [ ] Add validation for ServiceProfile resources
 - [ ] Add real-time traffic streaming via Linkerd Tap API
 - [ ] Add historical trend analysis and anomaly detection
+- [ ] Craft policies
+- [ ] Deploy test versions of the policies in audit mode
+- [ ] Analyze an audit mode setup of linkerd and figure out where and why traffic gets denied 
 
 ## License
 
