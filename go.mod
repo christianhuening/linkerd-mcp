@@ -3,7 +3,7 @@ module github.com/christianhuening/linkerd-mcp
 go 1.25.0
 
 require (
-	github.com/mark3labs/mcp-go v0.41.1
+	github.com/mark3labs/mcp-go v0.43.1
 	github.com/onsi/ginkgo/v2 v2.27.1
 	github.com/onsi/gomega v1.38.2
 	github.com/prometheus/client_golang v1.23.2
